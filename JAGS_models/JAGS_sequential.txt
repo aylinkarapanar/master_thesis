@@ -1,0 +1,70 @@
+model {
+##############
+#1. THE MODEL
+
+#############################1c. Sequential Model
+
+for (i in 1:Nobs) {
+lb[i] <- step((Mcenter[ID[i]] - z[ID[i]]) - diff[i]) #1 if diff<lower bound external part (i.e. use internal model) parameter
+ub[i] <- step(diff[i] - (Mcenter[ID[i]] + z[ID[i]])) #1 if diff>upper bound external part (i.e. use internal model) parameter
+
+logit(tmptheta31[i]) <- b0[ID[i]] + bint[ID[i]] * diff[i]
+logit(tmptheta32[i]) <- bext[ID[i]] * cue[i]
+
+theta3[i] <- (equals(lb[i], 1) * tmptheta31[i] + equals(ub[i], 1) * tmptheta31[i] + equals(lb[i], 0) * equals(ub[i], 0) * tmptheta32[i])
+
+# Bernoulli likelihood
+resp[i] ~ dbern(theta3[i])
+
+# Log-likelihood 
+loglik_obs[i] <- logdensity.bern(resp[i], theta3[i])
+}
+  
+# Sum by participant
+for (j in 1:n) {
+loglik[j] <- sum(loglik_obs[start_idx[j]:end_idx[j]])
+}
+  
+for(j in 1:n){
+Mcenter[j] <- -(b0[j]  / ifelse(bint[j]==0, 1E-16, bint[j]))
+#if b0[i]=0, then divide by .000001. if b0[i]!=0, Mcenter= -(b0[i]  / bint[i])
+}
+
+
+####################
+#2a. HYPERPARAMETERS
+
+b0mean ~ dnorm(0, 1/1^2)
+b0sd ~ dunif(.1, 1)
+b0precision <- 1/(b0sd^2)
+
+bintmean ~ dnorm(3, 1/1^2)
+bintsd ~ dunif(.1, 1)
+bintprecision <- 1/(bintsd^2)
+
+bextmean ~ dnorm(3, 1/1^2)T(1,)
+bextsd ~ dunif(.1, 1)
+bextprecision <- 1/(bextsd^2)
+
+zmean ~ dnorm(.85, 1/(1/6)^2)T(.4, 1.33)
+zsd ~ dunif(.1, .3)
+zprecision <- 1/(zsd^2)
+
+
+###############
+#3a. PARAMETERS
+
+for( j in 1:n){ #per participant j
+
+b0[j] ~ dnorm( b0mean, b0precision)
+
+bint[j] ~ dnorm( bintmean, bintprecision)
+
+bext[j]  ~ dnorm( bextmean,  bextprecision )T(1,)
+
+z[j] ~ dnorm(zmean, zprecision)T(.4,)
+#z cant be 0 cause then its just the internal model
+#z cant be 1.73 cause then its just the external model
+}
+
+}

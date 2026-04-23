@@ -1,0 +1,52 @@
+model {
+##############
+#1. THE MODEL
+
+############################
+
+#1a. Internal Strategy Model
+for ( i in 1:Nobs) {
+theta1[i] <- tmptheta1[i]
+logit(tmptheta1[i]) <- b0[ID[i]] + bint[ID[i]] * diff[i] #parameter
+
+# Bernoulli likelihood
+resp[i] ~ dbern(theta1[i])
+
+# Log-likelihood 
+loglik_obs[i] <- logdensity.bern(resp[i], theta1[i])
+}
+  
+# Sum by participant
+for (j in 1:n) {
+loglik[j] <- sum(loglik_obs[start_idx[j]:end_idx[j]])
+}
+  
+
+####################
+#2a. HYPERPARAMETERS
+
+b0mean ~ dnorm(0, 1/1^2)
+b0sd ~ dunif(.1, 1)
+b0precision <- 1/(b0sd^2)
+
+bintmean ~ dnorm(3, 1/1^2)
+bintsd ~ dunif(.1, 1)
+bintprecision <- 1/(bintsd^2)
+
+bextmean ~ dnorm(3, 1/1^2)T(1,)
+bextsd ~ dunif(.1, 1)
+bextprecision <- 1/(bextsd^2)
+
+###############
+#3a. PARAMETERS
+
+for( j in 1:n){ #per participant j
+
+b0[j] ~ dnorm( b0mean, b0precision)
+
+bint[j] ~ dnorm( bintmean, bintprecision)
+
+bext[j]  ~ dnorm( bextmean,  bextprecision )T(1,)
+}
+
+}

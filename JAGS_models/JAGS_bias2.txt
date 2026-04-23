@@ -1,0 +1,38 @@
+model {
+##############
+#1. THE MODEL
+
+############################
+#1g. Extreme Model 2 ('higher'/L2 preference)
+
+for ( i in 1:Nobs) {
+theta7[i] <- bias2[ID[i]]
+
+# Bernoulli likelihood
+resp[i] ~ dbern(theta7[i])
+
+# Log-likelihood 
+loglik_obs[i] <- logdensity.bern(resp[i], theta7[i])
+}
+  
+# Sum by participant
+for (j in 1:n) {
+loglik[j] <- sum(loglik_obs[start_idx[j]:end_idx[j]])
+}
+
+####################
+#2a. HYPERPARAMETERS
+
+bias2mean ~ dnorm( 0.9, 1/.1^2)
+bias2sd ~ dunif(.1, .3)
+bias2precision <- 1/(bias2sd^2)
+
+###############
+#3a. PARAMETERS
+
+for( j in 1:n){ #per participant j
+
+bias2[j] ~ dnorm(bias2mean, bias2precision)T(0.85, 1)
+}
+
+}

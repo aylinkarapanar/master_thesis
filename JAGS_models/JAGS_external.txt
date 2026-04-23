@@ -1,0 +1,35 @@
+model {
+##############
+# 1. THE MODEL
+############################
+# 1b. External Strategy Model
+  
+for (i in 1:Nobs) {
+theta2[i] <- tmptheta2[i]
+logit(tmptheta2[i]) <- bext[ID[i]] * cue[i]
+    
+# Bernoulli likelihood
+resp[i] ~ dbern(theta2[i])
+    
+loglik_obs[i] <- logdensity.bern(resp[i], theta2[i])
+}
+  
+# Sum by participant
+for (j in 1:n) {
+loglik[j] <- sum(loglik_obs[start_idx[j]:end_idx[j]])
+}
+  
+####################
+# 2a. HYPERPARAMETERS
+
+bextmean ~ dnorm(3, 1/1^2)T(1,)
+bextsd ~ dunif(.1, 1)
+bextprecision <- 1/(bextsd^2)
+  
+###############
+# 3a. PARAMETERS
+
+for(j in 1:n) { 
+bext[j] ~ dnorm(bextmean, bextprecision)T(1,)
+}
+}

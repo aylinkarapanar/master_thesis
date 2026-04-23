@@ -1,0 +1,36 @@
+model {
+##############
+#1. THE MODEL
+
+#############################1e. Guessing Model (random)
+
+for ( i in 1:Nobs) {
+theta5[i] <- guess[ID[i]]
+
+# Bernoulli likelihood
+resp[i] ~ dbern(theta5[i])
+
+# Log-likelihood 
+loglik_obs[i] <- logdensity.bern(resp[i], theta5[i])
+}
+  
+# Sum by participant
+for (j in 1:n) {
+loglik[j] <- sum(loglik_obs[start_idx[j]:end_idx[j]])
+}
+####################
+#2a. HYPERPARAMETERS
+
+guessmean ~ dnorm(.5, 1/.1^2)
+guesssd ~ dunif(.1, .3)
+guessprecision <- 1/(guesssd^2)
+
+###############
+#3a. PARAMETERS
+
+for( j in 1:n){ #per participant j
+
+guess[j] ~ dnorm(guessmean, guessprecision)T(0.40, .60)
+}
+
+}
