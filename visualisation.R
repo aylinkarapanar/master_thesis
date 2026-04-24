@@ -6,6 +6,8 @@ if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
 
 lapply(packages, library, character.only = TRUE)
 
+source("./metrics.R")
+
 plot_metric = function(data_path = "./metrics/metrics_all.csv",
                         metric = "accuracy",
                         output_dir = "./figures",
@@ -75,3 +77,9 @@ plot_metric = function(data_path = "./metrics/metrics_all.csv",
 
 # TODO: general cm and cm by condition
 
+labels = get_labels("./data/1234/150_180_equal_participants.csv",  "./model_assignments/hbi/1234/150_180_equal_strategy_assignments.csv", method_name)
+
+df = calculate_param_metrics(true_data_path = "./data/1234/150_180_equal_participants.csv", 
+                                predicted_data_path = "./model_assignments/hbi/1234/150_180_equal_strategy_assignments.csv",
+                                param_path = "./parameter_estimates/hbi/1234", 
+                                param_mapping = param_mapping)
