@@ -43,7 +43,7 @@ plot_metric = function(data_path = "./metrics/metrics_all.csv",
     # Define colours
     scale_fill_okabeito(
       labels = c(
-        posterior_prob = "Posterior Prob",
+        bf_ps = "BF estimation with PS",
         psis = "PSIS-LOO",
         waic = "WAIC",
         hbi = "HBI"
@@ -83,3 +83,6 @@ df = calculate_param_metrics(true_data_path = "./data/1234/150_180_equal_partici
                                 predicted_data_path = "./model_assignments/hbi/1234/150_180_equal_strategy_assignments.csv",
                                 param_path = "./parameter_estimates/hbi/1234", 
                                 param_mapping = param_mapping)
+
+# TODO: get cm tables and sum/concatenate over all the datasets and by condition
+# TODO: then visualise

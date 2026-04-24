@@ -8,20 +8,20 @@ if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
 lapply(packages, library, character.only = TRUE)
 
 
-posterior_probability = function(data_file,
+bf_ps = function(data_file,
                                  jags_text,
                                  n_iter = 20000,
                                  n_burnin = 5000,
                                  n_thin = 10,
                                  jags_seed,
-                                 time_data_file = "./runtime/runtime_posterior_prob.csv") {
+                                 time_data_file = "./runtime/runtime_bf_ps.csv") {
 
   seed_name = basename(dirname(data_file))  
   
   output_roots = c(
     parameter_estimates = "./parameter_estimates/product_space",
-    model_assignments = "./model_assignments/posterior_prob",
-    prob_strat = "./model_assignments/posterior_prob/prob_strat",
+    model_assignments = "./model_assignments/bf_ps",
+    prob_strat = "./model_assignments/bf_ps/prob_strat",
     warnings = "./parameter_estimates/product_space/warnings",
     traceplots = "./traceplots"
   )
@@ -148,7 +148,7 @@ posterior_probability = function(data_file,
   prevalence_type = parts[3]
   #params_type     = parts[4]
   
-  time_df = read.csv("./runtime/runtime_posterior_prob.csv")
+  time_df = read.csv("./runtime/runtime_bf_ps.csv")
 
    row_index = which(
    time_df$n_participant  == n_participant &

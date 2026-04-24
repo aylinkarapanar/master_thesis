@@ -25,7 +25,7 @@ get_labels = function(true_data_path,
 
     # Load predicted labels
     if (!is.null(predicted_data_path)) {
-        if (method_name == "posterior_prob") {
+        if (method_name == "bf_ps") {
         predicted_strategy = read.csv(predicted_data_path) %>%
             apply(2, Mode)
         

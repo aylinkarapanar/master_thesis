@@ -2,7 +2,6 @@
 ################################ SET-UP #####################################
 ##############################################################################
 
-# TODO: rename posterior prob as BF_PS
 initial_seed = 1234
 n_rep = 50
 
@@ -12,10 +11,10 @@ seed_vector = seq(from = initial_seed, to = initial_seed + n_rep - 1)
 # Create a df to keep track of the runs done
 #runs = data.frame(
 #  file = character(),           # path to the data file
-#  posterior_prob = logical(),   # TRUE if posterior probability was calculated
-#  waic = numeric(),             # placeholder for WAIC
-#  loo = numeric(),              # placeholder for LOO
-#  hbi = numeric(),              # placeholder for HBI
+#  bf_ps = logical(),  
+#  waic = logical(),             
+#  loo = logical(),              
+#  hbi = logical(),              
 #  stringsAsFactors = FALSE
 #)
 
@@ -103,11 +102,11 @@ setDT(simulation_conditions)
 # })
 
 ################################################################################
-######################## POSTERIOR PROBABILITIES ###############################
+###################### Bayes Factor Estimation Using Product Space ##############
 ################################################################################
 
 # TODO: IMPORTANT jags parallel does not use all the cores, n.cores used = n.chains
-# source("./posterior_probabilities.R")
+# source("./BF_PS.R")
 
 # Create time_df to store the runtime of the fucntion
 # time_df = copy(simulation_conditions)
@@ -120,7 +119,7 @@ setDT(simulation_conditions)
 # time_df$name = NA
 
 # # Create the runtime csv 
-# write.csv(time_df, file = "./runtime/runtime_posterior_prob.csv", row.names = FALSE)
+# write.csv(time_df, file = "./runtime/runtime_bf_ps.csv", row.names = FALSE)
 
 # Get all the data files in the data folder
 # data_files = list.files("./data", pattern = "_data\\.csv$", full.names = TRUE, recursive = TRUE)
@@ -130,10 +129,10 @@ setDT(simulation_conditions)
 #   runs = read.csv("runs.csv", stringsAsFactors = FALSE)
   
 #   row_idx = which(runs$file == f)
-#   already_done = any(runs$file == f & runs$posterior_prob == TRUE, na.rm = TRUE)
+#   already_done = any(runs$file == f & runs$bf_ps == TRUE, na.rm = TRUE)
 
 #   if (!already_done) {
-#     posterior_probability(
+#     bf_ps(
 #       data_file = f,
 #       jags_text = "./JAGS_models/JAGS_hierarchical.txt",
 #       n_iter    = 20000,
@@ -142,11 +141,11 @@ setDT(simulation_conditions)
 #       jags_seed = initial_seed
 #     )
 #     if (length(row_index)>0) {
-#       runs$posterior_prob[row_idx] = TRUE
+#       runs$bf_ps[row_idx] = TRUE
 #     } else {
 #       runs = rbind(
 #       runs,
-#       data.frame(file = f, posterior_prob = TRUE, waic = NA, loo = NA, hbi = NA))
+#       data.frame(file = f, bf_ps = TRUE, waic = NA, loo = NA, hbi = NA))
 #     }
   
 #     write.csv(runs, "runs.csv", row.names = FALSE)
@@ -242,7 +241,7 @@ setDT(simulation_conditions)
 #     } else {
 #     runs = rbind(
 #       runs,
-#       data.frame(file = f, posterior_prob = NA, waic = TRUE, loo = TRUE, hbi = NA)
+#       data.frame(file = f, bf_ps = NA, waic = TRUE, loo = TRUE, hbi = NA)
 #   )}
 #     write.csv(runs, "runs.csv", row.names = FALSE)
 #   })
@@ -257,7 +256,7 @@ source("./metrics.R")
 data_files = list.files("./data", pattern = "_participants\\.csv$", full.names = TRUE, recursive = TRUE)
 
 # Define the file path to the assignments
-method_dirs = list(posterior_prob = "./results_data/model_assignments/posterior_prob/",
+method_dirs = list(bf_ps = "./results_data/model_assignments/bf_ps/",
                    psis = "./results_data/model_assignments/PSIS-LOO/",
                    waic = "./results_data/model_assignments/WAIC/",
                    hbi = "./results_data/model_assignments/hbi")
