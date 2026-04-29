@@ -61,17 +61,17 @@ get_ci_bounds = function(param_name, param_info, level = 0.95) {
 
 # TODO: add product space and non-hierarchical param estimations
 # TODO: for PS should you take the mean of the param values over the iterations of MCMC?
-calculate_param_metrics = function(true_param_path,
-                                   true_assign_path, 
-                                   predicted_data_path,
+calculate_param_metrics = function(
+                                   true_data_path, 
+                                   predicted_assign_path,
                                    param_path,
                                    method_name = "hbi",
                                    param_mapping) {
 
   results_list = list()
   
-  seed_name = basename(dirname(predicted_data_path)) 
-  base = basename(predicted_data_path)
+  seed_name = basename(dirname(predicted_assign_path)) 
+  base = basename(predicted_assign_path)
   base = str_remove(base, "\\_strategy_assignments.csv$")
   parts = str_split(base, "_")[[1]]
   
@@ -80,40 +80,47 @@ calculate_param_metrics = function(true_param_path,
   prevalence_type = parts[3]
   
   true_data = read.csv(true_data_path)
-  labels = get_labels(true_assign_path, predicted_data_path, method_name)
-  
+  labels = get_labels(true_data_path, predicted_assign_path, method_name)
   correct_idx = which(labels$true == labels$predicted)
 
+  if (method_name == "hbi"){
+
+
+  }
   # Loop over models
   for (model_label in names(param_mapping)) {
-    
+    # print(model_label)
     model_info   = param_mapping[[model_label]]
     model_number = model_info$model_number
     model_params = model_info$params
     
     model_idx = which(as.numeric(labels$true) == model_number)
     model_correct_idx = intersect(model_idx, correct_idx)
+    
+    # print(model_correct_idx)
     if (length(model_correct_idx) == 0) next
     
     # Find and read the parameter estimation
     params_file = file.path(param_path, paste0(base, "_params_", model_number, ".csv"))
     if (!file.exists(params_file)) next
-    params_data = read.csv(params_file, header = FALSE)
+    params_data = read.csv(params_file, header = TRUE)
+
+    print(params_file)
+    
     colnames(params_data) = model_params
 
+    print(head(params_data))
+    print(dim(params_data))
+    print(model_correct_idx)
     # Loop over the correctly identified individuals
     for (i in model_correct_idx) {
       for (param_name in model_params) {
         
         if (!(param_name %in% colnames(true_data))) next
         
-        pred_val = if (param_name %in% colnames(params_data)) {
-          params_data[i, param_name]
-        } else {
-          param_index = which(model_params == param_name)
-          if (param_index > ncol(params_data)) next
-          params_data[i, param_index]
-        }
+        pred_val = params_data[i, param_name]
+
+        print(pred_val)
 
         true_val = as.numeric(true_data[i, param_name])
         pred_val = as.numeric(pred_val)
@@ -121,6 +128,7 @@ calculate_param_metrics = function(true_param_path,
         rmse_val = caret::RMSE(true_val, pred_val)
 
         ci_bounds = get_ci_bounds(param_name, param_info, level = 0.95)
+        print(ci_bounds)
         ci_lower = ci_bounds[1]
         ci_upper = ci_bounds[2]
         
@@ -146,15 +154,14 @@ calculate_param_metrics = function(true_param_path,
   }
   
   if (length(results_list) == 0) return(data.frame())
-  
   results_df = do.call(rbind, results_list)
   return(results_df)
 }
 
-df = calculate_param_metrics(true_data_path = "./data/1234/150_180_equal_participants.csv", 
-                                predicted_data_path = "./model_assignments/hbi/1234/150_180_equal_strategy_assignments.csv",
-                                param_path = "./parameter_estimates/hbi/1234", 
-                                param_mapping = param_mapping)
+# df = calculate_param_metrics(true_data_path = "./data/1234/150_180_equal_participants.csv", 
+#                                 predicted_data_path = "./model_assignments/hbi/1234/150_180_equal_strategy_assignments.csv",
+#                                 param_path = "./parameter_estimates/hbi/1234", 
+#                                 param_mapping = param_mapping)
 
-head(df)
-tail(df)
+# head(df)
+# tail(df)

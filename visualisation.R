@@ -7,6 +7,7 @@ if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
 lapply(packages, library, character.only = TRUE)
 
 source("./metrics.R")
+source("./parameter.R")
 
 plot_metric = function(data_path = "./metrics/metrics_all.csv",
                         metric = "accuracy",
@@ -77,12 +78,45 @@ plot_metric = function(data_path = "./metrics/metrics_all.csv",
 
 # TODO: general cm and cm by condition
 
-labels = get_labels("./data/1234/150_180_equal_participants.csv",  "./model_assignments/hbi/1234/150_180_equal_strategy_assignments.csv", method_name)
+labels = get_labels("./data/1234/150_180_equal_participants.csv", "./results_data/model_assignments/hbi/1234/150_180_equal_strategy_assignments.csv", method_name = "hbi")
 
-df = calculate_param_metrics(true_data_path = "./data/1234/150_180_equal_participants.csv", 
-                                predicted_data_path = "./model_assignments/hbi/1234/150_180_equal_strategy_assignments.csv",
-                                param_path = "./parameter_estimates/hbi/1234", 
-                                param_mapping = param_mapping)
+source("./parameter.R")
+
+# For now ignore models of non-interest
+param_mapping = list(
+    "internal" = list(
+        "model_number" = 1,
+        "params" = c("b0", "bint")
+    ),
+    "external" = list(
+        "model_number" = 2,
+        "params" = c("bext")
+    ),
+    "sequential" = list(
+        "model_number" = 3,
+        "params" = c("b0", "bint", "bext", "z")
+    ),
+    "integrative" = list(
+        "model_number" = 4,
+        "params" = c("b0", "bint", "bext")
+    )
+)
+
+param_info = list(
+  b0   = list(mean = 0,    sd = 0.5,  a = -Inf, b = Inf),
+  bint = list(mean = 2.5,  sd = 0.75, a = 0,    b = Inf),
+  bext = list(mean = 1.75, sd = 0.5,  a = 0.5,  b = Inf),
+  z    = list(mean = 1,    sd = 0.5,  a = 0.3,  b = 1.3),
+  guess= list(mean = 0.5,  sd = 0.02, a = 0.4,  b = 0.6),
+  bias1= list(mean = 0.05, sd = 0.02, a = 0,    b = 0.15),
+  bias2= list(mean = 0.95, sd = 0.02, a = 0.85, b = 1)
+)
+
+df = calculate_param_metrics(true_data_path = "./data/1234/150_180_equal_participants.csv",
+                                predicted_assign_path = "./results_data/model_assignments/hbi/1234/150_180_equal_strategy_assignments.csv",
+                                param_path = "./results_data/parameter_estimates/hbi/1234", 
+                                param_mapping = param_mapping,
+                                method_name = "hbi")
 
 # TODO: get cm tables and sum/concatenate over all the datasets and by condition
 # TODO: then visualise
