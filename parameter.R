@@ -59,6 +59,56 @@ get_ci_bounds = function(param_name, param_info, level = 0.95) {
   return(c(lower, upper))
 }
 
+# TODO: finish the ps params function
+get_ps_params = function(params_file, model_number, model_params) {
+  data = read.csv(params_file, header = TRUE)
+  
+  # get start data ((n_iter * n_chain - burn_in) /thin x n_participant)
+  # for participant i, overlay it to the params column 
+  # select the rows where the strat index matches the overall one
+  # take the mean to get the parameter estimate
+  # return params_data (n_participant x params)
+  
+  return(params_data)
+}
+
+# Helper function to process csv files with parameter values
+get_params_data = function(params_file, method_name, model_params) {
+  data = read.csv(params_file, header = TRUE)
+  
+  if (method_name == "hbi") {
+    params_data = data
+    colnames(params_data) = model_params
+
+  } else if (method_name %in% c("psis", "waic")){
+    # Average over MCMC iterations, then reshape to participants x params
+    means = colMeans(data)
+
+    # Split the column names to parameter name and index
+    split_names = strsplit(names(means), ".", fixed = TRUE)
+    param_part = sapply(split_names, "[", 1)
+    index_part = as.integer(sapply(split_names, "[", 2)) 
+
+    # Keep only columns belonging to the defined model's params (exclude parameter mean, sd or loglik)
+    keep = param_part %in% model_params
+    n_participants = max(index_part[keep])
+    params_data = as.data.frame(matrix(NA, nrow = n_participants, ncol = length(model_params)))
+    colnames(params_data) = model_params
+    
+    # Fill in each value at the right [participant, param] position
+    for (k in which(keep)) {
+      params_data[index_part[k], param_part[k]] = means[k]
+    }
+  } else if (method_name == "ps") {
+    # separate function would be better to keep it clean here
+    params_data = get_ps_params(params_file, model_number, model_params)
+  }
+  
+  return(params_data)
+}
+
+
+
 # TODO: add product space and non-hierarchical param estimations
 # TODO: for PS should you take the mean of the param values over the iterations of MCMC?
 calculate_param_metrics = function(
@@ -83,10 +133,6 @@ calculate_param_metrics = function(
   labels = get_labels(true_data_path, predicted_assign_path, method_name)
   correct_idx = which(labels$true == labels$predicted)
 
-  if (method_name == "hbi"){
-
-
-  }
   # Loop over models
   for (model_label in names(param_mapping)) {
     # print(model_label)
@@ -101,52 +147,53 @@ calculate_param_metrics = function(
     if (length(model_correct_idx) == 0) next
     
     # Find and read the parameter estimation
-    params_file = file.path(param_path, paste0(base, "_params_", model_number, ".csv"))
+    params_file = if (method_name == "hbi") {
+      file.path(param_path, paste0(base, "_params_", model_number, ".csv"))
+      } else if (method_name %in% c("psis", "waic")) {
+        file.path(param_path, paste0(base, "_", model_label, ".csv"))}
+    # print(params_file)
+    # print(file.exists(params_file))
     if (!file.exists(params_file)) next
-    params_data = read.csv(params_file, header = TRUE)
-
-    print(params_file)
+    params_data = get_params_data(params_file = params_file,
+                                  method_name = method_name, 
+                                  model_params = model_params)
     
-    colnames(params_data) = model_params
 
     print(head(params_data))
     print(dim(params_data))
     print(model_correct_idx)
     # Loop over the correctly identified individuals
     for (i in model_correct_idx) {
+      # For HBI, use the global index since params_data has all the participants 
+      # For PSIS/WAIC, use local index, since params_data has only model-assigned participants 
+      row_idx = if (method_name == "hbi") i else which(model_idx == i)
+      
       for (param_name in model_params) {
         
         if (!(param_name %in% colnames(true_data))) next
         
-        pred_val = params_data[i, param_name]
-
-        print(pred_val)
-
+        pred_val = as.numeric(params_data[row_idx, param_name])
         true_val = as.numeric(true_data[i, param_name])
-        pred_val = as.numeric(pred_val)
-
-        rmse_val = caret::RMSE(true_val, pred_val)
-
-        ci_bounds = get_ci_bounds(param_name, param_info, level = 0.95)
-        print(ci_bounds)
-        ci_lower = ci_bounds[1]
-        ci_upper = ci_bounds[2]
         
-        inside_ci = pred_val >= ci_lower & pred_val <= ci_upper
+        if (is.na(pred_val) || is.na(true_val)) next
+        
+        rmse_val  = caret::RMSE(pred_val, true_val)
+        ci_bounds = get_ci_bounds(param_name, param_info, level = 0.95)
+        inside_ci = pred_val >= ci_bounds[1] & pred_val <= ci_bounds[2]
         
         results_list[[length(results_list) + 1]] = data.frame(
-          seed = seed_name,
-          n_participants = n_participant,
-          n_items = n_items,
-          prevalence = prevalence_type,
-          method = method_name,
-          model = model_label,
-          individual_id = i,
-          param_name = param_name,
-          true_value = true_data[i, param_name],
+          seed            = seed_name,
+          n_participants  = n_participant,
+          n_items         = n_items,
+          prevalence      = prevalence_type,
+          method          = method_name,
+          model           = model_label,
+          individual_id   = i,
+          param_name      = param_name,
+          true_value      = true_val,
           predicted_value = pred_val,
-          rmse = rmse_val,
-          within_ci = inside_ci,
+          rmse            = rmse_val,
+          within_ci       = inside_ci,
           stringsAsFactors = FALSE
         )
       }

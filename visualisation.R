@@ -112,11 +112,23 @@ param_info = list(
   bias2= list(mean = 0.95, sd = 0.02, a = 0.85, b = 1)
 )
 
+# TESTS
 df = calculate_param_metrics(true_data_path = "./data/1234/150_180_equal_participants.csv",
                                 predicted_assign_path = "./results_data/model_assignments/hbi/1234/150_180_equal_strategy_assignments.csv",
                                 param_path = "./results_data/parameter_estimates/hbi/1234", 
                                 param_mapping = param_mapping,
                                 method_name = "hbi")
+
+df = calculate_param_metrics(true_data_path = "./data/1234/150_180_equal_participants.csv",
+                                predicted_assign_path = "./results_data/model_assignments/PSIS-LOO/1234/150_180_equal_strategy_assignments.csv",
+                                param_path = "./results_data/parameter_estimates/non_hierarchical/PSIS-LOO/1234", 
+                                param_mapping = param_mapping,
+                                method_name = "psis")
+
+params_file = "./results_data/parameter_estimates/non_hierarchical/PSIS-LOO/1234/150_180_equal_internal.csv"
+model_params = c("b0", "bint")
+
+result = get_params_data(params_file, method_name = "psis", model_params = model_params)
 
 # TODO: get cm tables and sum/concatenate over all the datasets and by condition
 # TODO: then visualise

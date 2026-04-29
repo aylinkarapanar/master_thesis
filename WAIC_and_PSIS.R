@@ -1,3 +1,4 @@
+# TODO: make the csv naming for the params consistent with the hbi 
 packages = c("R2jags", "loo", "dplyr", "stringr", "benchmarkme", "see")
 
 if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
