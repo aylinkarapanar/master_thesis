@@ -60,21 +60,43 @@ get_ci_bounds = function(param_name, param_info, level = 0.95) {
 }
 
 # TODO: finish the ps params function
-get_ps_params = function(params_file, model_number, model_params) {
-  data = read.csv(params_file, header = TRUE)
-  
-  # get start data ((n_iter * n_chain - burn_in) /thin x n_participant)
-  # for participant i, overlay it to the params column 
-  # select the rows where the strat index matches the overall one
-  # take the mean to get the parameter estimate
-  # return params_data (n_participant x params)
-  
+get_ps_params = function(data, predicted_assign_path, model_params) {
+  # data = read.csv(param_path, header = TRUE)
+  strat = read.csv(predicted_assign_path, header = TRUE)
+  strat_binary = as.data.frame(apply(strat, 2, function(col) {
+    assigned_label = Mode(col)
+    as.integer(col == assigned_label)
+    })
+  )
+
+  # print(head(strat_binary))
+  # print(dim(strat_binary))
+  split_names = strsplit(names(data), ".", fixed = TRUE)
+  param_part = sapply(split_names, "[", 1)
+  index_part = as.integer(sapply(split_names, "[", 2)) 
+  keep = param_part %in% model_params
+
+  n_participants = max(index_part[keep])
+  params_data = matrix(NA, nrow = n_participants, ncol = length(model_params))
+  colnames(params_data) = model_params
+
+  for (k in which(keep)) {
+    idx = index_part[k]
+    param = param_part[k]
+    # print(head(strat_binary[, idx]))
+    # print(head(data[, k]))
+    value = mean(strat_binary[, idx] * data[, k], na.rm = TRUE)
+    params_data[idx, param] = value
+  }
+
+  # print(head(params_data))
   return(params_data)
 }
 
+
 # Helper function to process csv files with parameter values
-get_params_data = function(params_file, method_name, model_params) {
-  data = read.csv(params_file, header = TRUE)
+get_params_data = function(param_path, predicted_assign_path, method_name, model_params) {
+  data = read.csv(param_path, header = TRUE)
   
   if (method_name == "hbi") {
     params_data = data
@@ -101,13 +123,16 @@ get_params_data = function(params_file, method_name, model_params) {
     }
   } else if (method_name == "ps") {
     # separate function would be better to keep it clean here
-    params_data = get_ps_params(params_file, model_number, model_params)
+    params_data = get_ps_params(data, predicted_assign_path, model_params)
   }
   
   return(params_data)
 }
 
 
+# get_params_data(param_path = "./results_data/parameter_estimates/product_space/1234/150_180_equal_params.csv",
+#               predicted_assign_path = "./results_data/model_assignments/posterior_prob/1234/150_180_equal_strategy_assignments.csv",
+#               model_params = c("b0", "bint"), method_name = "ps")
 
 # TODO: add product space and non-hierarchical param estimations
 # TODO: for PS should you take the mean of the param values over the iterations of MCMC?

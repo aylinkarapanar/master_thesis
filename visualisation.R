@@ -128,6 +128,11 @@ df = calculate_param_metrics(true_data_path = "./data/1234/150_180_equal_partici
 params_file = "./results_data/parameter_estimates/non_hierarchical/PSIS-LOO/1234/150_180_equal_internal.csv"
 model_params = c("b0", "bint")
 
+
+result = get_ps_params(params_file = "results_data/parameter_estimates/product_space/1234/150_180_equal_params.csv",
+              predicted_assign_file = "results_data/model_assignments/posterior_prob/1234/150_180_equal_strategy_assignments.csv",
+              model_params = c("b0", "bint"))
+
 result = get_params_data(params_file, method_name = "psis", model_params = model_params)
 
 # TODO: get cm tables and sum/concatenate over all the datasets and by condition
