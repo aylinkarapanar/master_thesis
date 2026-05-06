@@ -138,13 +138,25 @@ make_metrics_df = function(true_data_path,
     if (save_together) {
     # Save all of the metrics
         file_path = file.path(output_dir, "metrics_all.csv")
-        write.table(
-            results,
-            file = file_path,
-            sep = ",",
-            row.names = FALSE,
-            col.names = !file.exists(file_path),  
-            append = TRUE)
+        if (!file.exists(file_path)) {
+                write.table(
+                    results,
+                    file = file_path,
+                    sep = ",",
+                    row.names = FALSE,
+                    col.names = TRUE,
+                    append = FALSE
+                )
+            } else {
+                write.table(
+                    results,
+                    file = file_path,
+                    sep = ",",
+                    row.names = FALSE,
+                    col.names = FALSE,
+                    append = TRUE
+                )
+            }
     } else {
     # Save each metric separately
         for (m in metrics) {
@@ -156,4 +168,3 @@ make_metrics_df = function(true_data_path,
   
   return(results)
 }
-
