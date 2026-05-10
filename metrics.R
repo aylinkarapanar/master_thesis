@@ -27,7 +27,10 @@ get_labels = function(true_data_path,
     if (!is.null(predicted_data_path)) {
         if (method_name == "bf_ps") {
         predicted_strategy = read.csv(predicted_data_path) %>%
-            apply(2, Mode)
+        # Tie happened on only 11 cases
+            # apply(2, Mode)
+            # Therefore in case of a tie, first mode is taken
+            apply(2, function(x) Mode(x)[1])
         
         predicted_labels = data.frame(
             ID = 1:length(predicted_strategy),

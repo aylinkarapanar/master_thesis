@@ -22,7 +22,7 @@ seed_vector = seq(from = initial_seed, to = initial_seed + n_rep - 1)
 # write.csv(runs, "runs.csv", row.names = FALSE)
 
 
-packages = c("data.table", "caret", "dplyr", "stringr", "benchmarkme")
+packages = c("data.table", "caret", "dplyr", "stringr", "benchmarkme", "purrr", "tidyr")
 
 if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
   install.packages(setdiff(packages, rownames(installed.packages())))
@@ -421,7 +421,7 @@ lapply(metrics, function(m) {
     data_path = "./metrics/metrics_all.csv",
     metric = m,
     output_dir = "./figures/metrics",
-    width = 8, 
+    width = 10, 
     height = 6
   )
 })
@@ -436,9 +436,17 @@ visualise_cm(all_labels_df,
 # Scatter plot for parameter estimates
 scatter_params(params_df, output_dir = "./figures/params")
 
-bar_rmse(params_df, width = 20, height = 12)
+bar_rmse(params_df, width = 16, height = 8)
 
-bar_bias(params_df, width = 20, height = 12)
+bar_rmse_by_model(params_df, width = 10, height = 6)
+
+bar_rmse_avg_model(params_df, width = 12, height = 6)
+
+bar_bias(params_df, width = 16, height = 8)
+
+bar_bias_by_model(params_df, width = 10, height = 6)
+
+bar_bias_avg_model(params_df, width = 12, height = 6)
 
 params_df %>%
   mutate(param_label = paste0(model, "-", param_name)) %>%
@@ -452,15 +460,13 @@ params_df %>%
   print(n = Inf)
 
 params_df %>% 
-  group_by(method) %>%
+  group_by(method, model) %>%
   summarise(
-    mean_rmse = round(mean(rmse, na.rm = TRUE), 3),
-    sd_rmse = round(sd(rmse, na.rm = TRUE), 3),
+    mean_rmse = round(mean(rmse, na.rm = TRUE), 2),
+    sd_rmse = round(sd(rmse, na.rm = TRUE), 2),
     .groups = "drop"
   ) %>%
   print(n = Inf)
-
-
 
 performance_df %>%
   group_by(prevalence, n_participants, n_items, method) %>%
@@ -477,3 +483,61 @@ performance_df %>%
   ) %>%
   arrange(prevalence, n_participants, n_items, method) %>%
   print(n = Inf, width = Inf)
+
+
+classification_results = all_labels_df %>%
+  mutate(
+    true = factor(true),
+    predicted = factor(predicted, levels = levels(true))
+  ) %>%
+  group_by(method) %>%
+  summarise(
+    cm = list(
+      confusionMatrix(
+        data = predicted,
+        reference = true,
+        mode = "prec_recall"
+      )
+    ),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    by_class = map(cm, ~ {
+      bc = as.data.frame(.x$byClass)
+      bc$class = rownames(bc)
+
+      tab = .x$table
+      total = sum(tab)
+
+      class_acc = map_dbl(rownames(tab), function(cl) {
+        TP = tab[cl, cl]
+        FP = sum(tab[, cl]) - TP
+        FN = sum(tab[cl, ]) - TP
+        TN = total - TP - FP - FN
+
+        (TP + TN) / total
+      })
+
+      bc$class_accuracy = class_acc
+
+      bc
+    })
+  ) %>%
+  select(method, by_class) %>%
+  unnest(by_class) %>%
+  mutate(
+    class_accuracy = round(class_accuracy, 2),
+    Precision = round(Precision, 2),
+    Recall = round(Recall, 2),
+    F1 = round(F1, 2)
+  ) %>%
+  select(
+    method,
+    class,
+    class_accuracy,
+    Precision,
+    Recall,
+    F1
+  )
+
+print(classification_results, n = Inf, width = Inf)

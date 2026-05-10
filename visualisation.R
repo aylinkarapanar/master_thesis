@@ -22,7 +22,7 @@ method_colors = c(
 
 method_labels = c(
   # bf_ps = "BF estimation with PS",
-  bf_ps = "BF",
+  bf_ps = "BFPS",
   psis  = "PSIS-LOO",
   waic  = "WAIC",
   hbi   = "HBI"
@@ -70,10 +70,17 @@ plot_metric = function(data_path = "./metrics/metrics_all.csv",
       x = "Number of participants",
       y = tools::toTitleCase(metric),
       fill = "Method",
-      title = paste(tools::toTitleCase(metric), "Across Conditions for Methods")
+      # title = paste(tools::toTitleCase(metric), "Across Conditions for Methods")
     ) +
-    theme_bw() +
-    theme(strip.text = element_text(face = "bold"))
+    theme_bw(base_size = 14) +
+    theme(
+      strip.text = element_text(face = "bold"),
+      axis.text = element_text(size = 12),
+      axis.title = element_text(size = 14),
+      legend.text = element_text(size = 10),
+      legend.title = element_text(size = 12),
+      legend.position = "right"
+    )
 
   # Create output directory, if doesn't exists
   if (!dir.exists(output_dir)) {
@@ -172,16 +179,19 @@ visualise_cm = function(all_labels_df,
           )
         ) +
         labs(
-          title = paste("Confusion Matrices for", full_label),
+          # title = paste("Confusion Matrices for", full_label),
           x = "Predicted strategy",
           y = "True strategy"
         ) +
-        theme_bw(base_size = 11) +
+        theme_bw(base_size = 14) +
         theme(
-          plot.title = element_text(face = "bold", hjust = 0.5),
+          # plot.title = element_text(face = "bold", hjust = 0.5),
           strip.text = element_text(face = "bold"),
           panel.grid = element_blank(),
-          axis.text = element_text(size = 8),
+          axis.text = element_text(size = 14),
+          axis.title = element_text(size = 16),
+          legend.text = element_text(size = 13),
+          legend.title = element_text(size = 14),
           legend.position = "right"
         )
 
@@ -200,7 +210,7 @@ visualise_cm = function(all_labels_df,
       p = ggplot(cm_df_overall, aes(x = Prediction, y = Reference, fill = Proportion)) +
         geom_tile(colour = "white", linewidth = 0.4) +
         geom_text(aes(label = ifelse(Proportion > 0.01, sprintf("%.2f", Proportion), "")),
-          size = 4
+          size = 6
         ) +
         scale_fill_gradient(
           low = "white",
@@ -211,11 +221,21 @@ visualise_cm = function(all_labels_df,
         scale_x_discrete(position = "top") +
         scale_y_discrete(limits = rev) +
         labs(
-          title = paste("Overall Confusion Matrix for", full_label),
+          # title = paste("Overall Confusion Matrix for", full_label),
           x = "Predicted strategy",
           y = "True strategy"
         ) +
-        theme_bw()
+        theme_bw(base_size = 16) +
+        theme(
+          # plot.title = element_text(face = "bold", hjust = 0.5),
+          strip.text = element_text(face = "bold"),
+          panel.grid = element_blank(),
+          axis.text = element_text(size = 16),
+          axis.title = element_text(size = 18),
+          legend.text = element_text(size = 13),
+          legend.title = element_text(size = 16),
+          legend.position = "right"
+        )
 
       ggsave(file.path(output_dir, paste0("cm_overall_", m, ".png")),
         plot = p, width = 8, height = 6, dpi = 300
@@ -280,97 +300,11 @@ visualise_cm = function(all_labels_df,
 
 # result = get_params_data(param_path, predicted_assign_path = predicted_assign_path, method_name = "ps", model_params = model_params)
 
-scatter_params = function(params_df,
-                           output_dir = "./figures/params",
-                           width = 14,
-                           height = 10) {
-  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-
-  params_df = params_df %>%
-    mutate(
-      method = factor(method, levels = names(method_colors)),
-      fill_col = ifelse(within_ci, method_colors[as.character(method)], "white"),
-      ci_label = factor(
-        ifelse(within_ci, "Within CI", "Outside CI"),
-        levels = c("Within CI", "Outside CI")
-      )
-    )
-
-  for (mod in unique(params_df$model)) {
-    df_model = filter(params_df, model == mod)
-
-    p = ggplot(df_model, aes(
-      x = true_value,
-      y = predicted_value,
-      colour = method,
-      fill = fill_col,
-      shape = ci_label
-    )) +
-      geom_abline(
-        slope = 1, intercept = 0,
-        linetype = "dashed", colour = "grey50", linewidth = 0.6
-      ) +
-      geom_point(
-        position = position_jitter(width = 0.05, height = 0.05, seed = 42),
-        size = 1.8,
-        stroke = 0.6,
-        alpha = 0.6
-      ) +
-      scale_fill_identity() +
-      scale_colour_manual(
-        values = method_colors,
-        labels = method_labels,
-        name = "Method"
-      ) +
-      scale_shape_manual(
-        values = c("Within CI" = 21, "Outside CI" = 21),
-        name = "95% CI"
-      ) +
-      facet_grid(
-        method ~ param_name,
-        scales = "free",
-        labeller = labeller(method = method_labels)
-      ) +
-      labs(
-        title = paste("Parameter Recovery —", tools::toTitleCase(mod), "Model"),
-        x = "True value",
-        y = "Predicted value"
-      ) +
-      guides(
-        colour = "none",
-        shape = guide_legend(
-          order = 1,
-          override.aes = list(
-            colour = c("Within CI" = "grey40", "Outside CI" = "grey40"),
-            fill = c("Within CI" = "grey40", "Outside CI" = "white")
-          )
-        )
-      ) +
-      theme_bw() +
-      theme(
-        plot.title = element_text(face = "bold", hjust = 0.5),
-        strip.text = element_text(face = "bold"),
-        legend.position = "right"
-      )
-
-    file_name = paste0("scatter_params_", mod, ".png")
-    ggsave(
-      filename = file.path(output_dir, file_name),
-      plot = p,
-      width = width,
-      height = height,
-      dpi = 300
-    )
-  }
-}
-
-
 bar_rmse = function(params_df,
                      output_dir = "./figures/params",
                      width = 14,
                      height = 8) {
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-
   df = params_df %>%
     mutate(
       param_label = paste0(model, "-", param_name),
@@ -382,17 +316,13 @@ bar_rmse = function(params_df,
       se_rmse = sd(rmse, na.rm = TRUE) / sqrt(n()),
       .groups = "drop"
     )
-
   model_order = c("internal", "external", "sequential", "integrative")
-
   param_order = df %>%
     distinct(model, param_label) %>%
     mutate(model = factor(model, levels = model_order)) %>%
     arrange(model, param_label) %>%
     pull(param_label)
-
   df$param_label = factor(df$param_label, levels = param_order)
-
   p = ggplot(df, aes(x = param_label, y = mean_rmse, fill = method)) +
     geom_col(
       position = position_dodge(width = 0.8),
@@ -448,7 +378,6 @@ bar_rmse = function(params_df,
       legend.position = "right",
       panel.grid.major.x = element_blank()
     )
-
   ggsave(
     filename = file.path(output_dir, "bar_rmse.png"),
     plot = p,
@@ -535,18 +464,22 @@ bar_bias = function(params_df,
     ) +
     scale_y_continuous(expand = expansion(mult = c(0.1, 0.1))) +
     labs(
-      title = "Parameter Recovery Bias by Method and Parameter",
+      # title = "Parameter Recovery Bias by Method and Parameter",
       x = "Parameter",
       y = "Mean Bias",
-      fill  = "Method"
+      fill = "Method"
     ) +
-    theme_bw() +
+    theme_bw(base_size = 16) +
     theme(
       plot.title = element_text(face = "bold", hjust = 0.5),
       strip.text = element_text(face = "bold"),
       axis.text.x = element_text(angle = 40, hjust = 1, size = 9),
       legend.position = "right",
-      panel.grid.major.x = element_blank()
+      panel.grid.major.x = element_blank(),
+      axis.text = element_text(size = 16),
+      axis.title = element_text(size = 18),
+      legend.text = element_text(size = 13),
+      legend.title = element_text(size = 16),
     )
 
   ggsave(
@@ -555,5 +488,337 @@ bar_bias = function(params_df,
     width = width,
     height = height,
     dpi = 300
+  )
+}
+
+
+bar_rmse_by_model = function(params_df,
+                              output_dir = "./figures/params",
+                              width = 14,
+                              height = 8) {
+  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+
+  model_order = c("internal", "external", "sequential", "integrative")
+
+  df = params_df %>%
+    mutate(
+      param_label = paste0(model, "-", param_name),
+      method = factor(method, levels = names(method_colors))
+    ) %>%
+    group_by(n_participants, n_items, prevalence, method, model, param_label) %>%
+    summarise(
+      mean_rmse = mean(rmse, na.rm = TRUE),
+      se_rmse = sd(rmse, na.rm = TRUE) / sqrt(n()),
+      .groups = "drop"
+    )
+
+  for (m in model_order) {
+    df_model = df %>% filter(model == m)
+
+    if (nrow(df_model) == 0) next
+
+    param_order = df_model %>%
+      distinct(param_label) %>%
+      arrange(param_label) %>%
+      pull(param_label)
+
+    df_model$param_label = factor(df_model$param_label, levels = param_order)
+
+    p = ggplot(df_model, aes(x = param_label, y = mean_rmse, fill = method)) +
+      geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+      geom_errorbar(
+        aes(ymin = mean_rmse - se_rmse, ymax = mean_rmse + se_rmse),
+        position = position_dodge(width = 0.8),
+        width = 0.25,
+        linewidth = 0.5
+      ) +
+      facet_grid(
+        prevalence ~ n_items + n_participants,
+        labeller = labeller(
+          prevalence = c("equal" = "Equal Prevalence", "extreme" = "Extreme Prevalence"),
+          n_items = c("60" = "60 Items", "120" = "120 Items"),
+          n_participants = c("150" = "N = 150", "300" = "N = 300")
+        )
+      ) +
+      scale_fill_manual(values = method_colors, labels = method_labels) +
+      scale_y_continuous(
+        limits = c(0, 1.7),
+        breaks = seq(0, 1.7, 0.2)
+      ) +
+      labs(
+        # title = paste("Parameter Recovery RMSE —", tools::toTitleCase(m), "Model"),
+        x = "Parameter",
+        y = "Mean RMSE",
+        fill = "Method"
+      ) +
+      theme_bw(base_size = 14) +
+      theme(
+        plot.title = element_text(face = "bold", hjust = 0.5),
+        strip.text = element_text(face = "bold"),
+        axis.text.x = element_text(angle = 40, hjust = 1, size = 9),
+        legend.position = "right",
+        panel.grid.major.x = element_blank(),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16),
+        legend.text = element_text(size = 13),
+        legend.title = element_text(size = 14),
+      )
+      
+
+    ggsave(
+      filename = file.path(output_dir, paste0("bar_rmse_", m, ".png")),
+      plot = p,
+      width = width,
+      height = height,
+      dpi = 300
+    )
+  }
+}
+
+bar_bias_by_model = function(params_df,
+                              output_dir = "./figures/params",
+                              width = 14,
+                              height = 8) {
+  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+
+  model_order = c("internal", "external", "sequential", "integrative")
+
+  df = params_df %>%
+    mutate(
+      bias = predicted_value - true_value,
+      param_label = paste0(model, "-", param_name),
+      method = factor(method, levels = names(method_colors))
+    ) %>%
+    group_by(n_participants, n_items, prevalence, method, model, param_label) %>%
+    summarise(
+      mean_bias = mean(bias, na.rm = TRUE),
+      se_bias = sd(bias, na.rm = TRUE) / sqrt(n()),
+      .groups = "drop"
+    )
+
+  for (m in model_order) {
+    df_model = df %>% filter(model == m)
+
+    if (nrow(df_model) == 0) next
+
+    param_order = df_model %>%
+      distinct(param_label) %>%
+      arrange(param_label) %>%
+      pull(param_label)
+
+    df_model$param_label = factor(df_model$param_label, levels = param_order)
+
+    p = ggplot(df_model, aes(x = param_label, y = mean_bias, fill = method)) +
+      geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+      geom_errorbar(
+        aes(ymin = mean_bias - se_bias, ymax = mean_bias + se_bias),
+        position = position_dodge(width = 0.8),
+        width = 0.25,
+        linewidth = 0.5
+      ) +
+      geom_hline(yintercept = 0, linewidth = 0.7, colour = "grey20") +
+      facet_grid(
+        prevalence ~ n_items + n_participants,
+        labeller = labeller(
+          prevalence = c("equal" = "Equal Prevalence", "extreme" = "Extreme Prevalence"),
+          n_items = c("60" = "60 Items", "120" = "120 Items"),
+          n_participants = c("150" = "N = 150", "300" = "N = 300")
+        )
+      ) +
+      scale_fill_manual(values = method_colors, labels = method_labels) +
+      scale_y_continuous(
+        limits = c(-1.5, 0.7),
+        breaks = seq(-1.5, 0.7, 0.2),
+        expand = expansion(mult = c(0.1, 0.1))
+      ) +
+      labs(
+        # title = paste("Parameter Recovery Bias —", tools::toTitleCase(m), "Model"),
+        x = "Parameter",
+        y = "Mean Bias",
+        fill = "Method"
+      ) +
+      theme_bw(base_size = 14) +
+      theme(
+        plot.title = element_text(face = "bold", hjust = 0.5),
+        strip.text = element_text(face = "bold"),
+        axis.text.x = element_text(angle = 40, hjust = 1, size = 9),
+        legend.position = "right",
+        panel.grid.major.x = element_blank(),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16),
+        legend.text = element_text(size = 13),
+        legend.title = element_text(size = 14),
+      )
+
+    ggsave(
+      filename = file.path(output_dir, paste0("bar_bias_", m, ".png")),
+      plot = p,
+      width = width,
+      height = height,
+      dpi = 300
+    )
+  }
+}
+
+bar_rmse_avg_model = function(params_df,
+                               output_dir = "./figures/params",
+                               width = 14,
+                               height = 8) {
+  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+
+  df = params_df %>%
+    mutate(method = factor(method, levels = names(method_colors))) %>%
+    group_by(n_participants, n_items, prevalence, method, model) %>%
+    summarise(
+      mean_rmse = mean(rmse, na.rm = TRUE),
+      se_rmse   = sd(rmse, na.rm = TRUE) / sqrt(n()),
+      .groups   = "drop"
+    ) %>%
+    mutate(model = factor(model, levels = c("internal", "external", "sequential", "integrative")))
+
+  p = ggplot(df, aes(x = model, y = mean_rmse, fill = method)) +
+    geom_col(
+      position = position_dodge(width = 0.8),
+      width = 0.7
+    ) +
+    geom_errorbar(
+      aes(
+        ymin = mean_rmse - se_rmse,
+        ymax = mean_rmse + se_rmse
+      ),
+      position = position_dodge(width = 0.8),
+      width = 0.25,
+      linewidth = 0.5
+    ) +
+    facet_grid(
+      prevalence ~ n_items + n_participants,
+      labeller = labeller(
+        prevalence = c(
+          "equal"   = "Equal Prevalence",
+          "extreme" = "Extreme Prevalence"
+        ),
+        n_items = c(
+          "60"  = "60 Items",
+          "120" = "120 Items"
+        ),
+        n_participants = c(
+          "150" = "N = 150",
+          "300" = "N = 300"
+        )
+      )
+    ) +
+    scale_fill_manual(
+      values = method_colors,
+      labels = method_labels
+    ) +
+    labs(
+      x    = "Model",
+      y    = "Mean RMSE",
+      fill = "Method"
+    ) +
+    theme_bw(base_size = 14) +
+    theme(
+      strip.text = element_text(face = "bold"),
+      axis.text.x = element_text(angle = 30, hjust = 1, size = 10),
+      legend.position = "right",
+      panel.grid.major.x = element_blank(),
+      axis.text = element_text(size = 14),
+      axis.title = element_text(size = 16),
+      legend.text = element_text(size = 13),
+      legend.title = element_text(size = 14),
+    )
+
+  ggsave(
+    filename = file.path(output_dir, "bar_rmse_avg_model.png"),
+    plot     = p,
+    width    = width,
+    height   = height,
+    dpi      = 300
+  )
+}
+
+bar_bias_avg_model = function(params_df,
+                              output_dir = "./figures/params",
+                              width = 14,
+                              height = 8) {
+  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+
+  df = params_df %>%
+    mutate(
+      bias   = predicted_value - true_value,
+      method = factor(method, levels = names(method_colors))
+    ) %>%
+    group_by(n_participants, n_items, prevalence, method, model) %>%
+    summarise(
+      mean_bias = mean(bias, na.rm = TRUE),
+      se_bias   = sd(bias, na.rm = TRUE) / sqrt(n()),
+      .groups   = "drop"
+    ) %>%
+    mutate(model = factor(model, levels = c("internal", "external", "sequential", "integrative")))
+
+  p = ggplot(df, aes(x = model, y = mean_bias, fill = method)) +
+    geom_col(
+      position = position_dodge(width = 0.8),
+      width = 0.7
+    ) +
+    geom_errorbar(
+      aes(
+        ymin = mean_bias - se_bias,
+        ymax = mean_bias + se_bias
+      ),
+      position = position_dodge(width = 0.8),
+      width = 0.25,
+      linewidth = 0.5
+    ) +
+    geom_hline(
+      yintercept = 0,
+      linewidth  = 0.7,
+      colour     = "grey20"
+    ) +
+    facet_grid(
+      prevalence ~ n_items + n_participants,
+      labeller = labeller(
+        prevalence = c(
+          "equal"   = "Equal Prevalence",
+          "extreme" = "Extreme Prevalence"
+        ),
+        n_items = c(
+          "60"  = "60 Items",
+          "120" = "120 Items"
+        ),
+        n_participants = c(
+          "150" = "N = 150",
+          "300" = "N = 300"
+        )
+      )
+    ) +
+    scale_fill_manual(
+      values = method_colors,
+      labels = method_labels
+    ) +
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.1))) +
+    labs(
+      x    = "Model",
+      y    = "Mean Bias",
+      fill = "Method"
+    ) +
+    theme_bw(base_size = 16) +
+    theme(
+      strip.text      = element_text(face = "bold"),
+      axis.text.x     = element_text(angle = 30, hjust = 1, size = 10),
+      legend.position = "right",
+      panel.grid.major.x = element_blank(),
+      axis.text       = element_text(size = 16),
+      axis.title      = element_text(size = 18),
+      legend.text     = element_text(size = 13),
+      legend.title    = element_text(size = 16)
+    )
+
+  ggsave(
+    filename = file.path(output_dir, "bar_bias_avg_model.png"),
+    plot     = p,
+    width    = width,
+    height   = height,
+    dpi      = 300
   )
 }
