@@ -1,6 +1,13 @@
 ###############################################################################
 ################################ SET-UP #####################################
 ##############################################################################
+packages = c("data.table", "caret", "dplyr", "stringr", "benchmarkme", "purrr", "tidyr")
+
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))
+}
+
+lapply(packages, library, character.only = TRUE)
 
 initial_seed = 1234
 n_rep = 50
@@ -10,7 +17,7 @@ seed_vector = seq(from = initial_seed, to = initial_seed + n_rep - 1)
 
 # Create a df to keep track of the runs done
 # runs = data.frame(
-#  file = character(),           # path to the data file
+#  file = character(), 
 #  bf_ps = logical(),
 #  waic = logical(),
 #  loo = logical(),
@@ -21,60 +28,26 @@ seed_vector = seq(from = initial_seed, to = initial_seed + n_rep - 1)
 # Save it to CSV
 # write.csv(runs, "runs.csv", row.names = FALSE)
 
-
-packages = c("data.table", "caret", "dplyr", "stringr", "benchmarkme", "purrr", "tidyr")
-
-if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
-  install.packages(setdiff(packages, rownames(installed.packages())))
-}
-
-lapply(packages, library, character.only = TRUE)
-
-
 ###############################################################################
 ############################ DATA SIMULATION ##################################
 ##############################################################################
 
-# source("./data_simulation.R")
+source("./data_simulation.R")
 
 prevalence_list = list(
   equal = rep(1 / 7, 7),
-  # moderate = c(0.3, 0.2, 0.15, 0.15, 0.1, 0.05, 0.05),
   extreme = c(0.6, 0.15, 0.1, 0.05, 0.05, 0.025, 0.025)
 )
-
-# params_list = list(
-#  high = list(
-#    bint_mean = 3,
-#    bext_mean = 3,
-#    z_mean = 0.8
-#  ),
-#  moderate = list(
-#    bint_mean = 1.5,
-#    bext_mean = 1.5,
-#    z_mean = 0.8
-#  ),
-#  low = list(
-#    bint_mean = 0.5,
-#    bext_mean = 0.5,
-#    z_mean = 0.2
-#  )
-# )
 
 simulation_conditions = expand.grid(
   n_participant = c(150, 300),
   n_items = c(60, 120),
   prevalence_type = names(prevalence_list),
-  # params_type = names(params_list),
   stringsAsFactors = FALSE
 )
 
 simulation_conditions$prevalence =
   prevalence_list[simulation_conditions$prevalence_type]
-
-# simulation_conditions$params =
-#  params_list[simulation_conditions$params_type]
-
 
 setDT(simulation_conditions)
 
@@ -105,8 +78,7 @@ setDT(simulation_conditions)
 ###################### Bayes Factor Estimation Using Product Space ##############
 ################################################################################
 
-# TODO: IMPORTANT jags parallel does not use all the cores, n.cores used = n.chains
-# source("./BF_PS.R")
+source("./BF_PS.R")
 
 # Create time_df to store the runtime of the fucntion
 # time_df = copy(simulation_conditions)
@@ -155,7 +127,7 @@ setDT(simulation_conditions)
 ################################################################################
 ########################### WAIC AND PSIS-LOO ##################################
 ################################################################################
-# source("./WAIC_and_PSIS.R")
+source("./WAIC_and_PSIS.R")
 
 # time_df = simulation_conditions[rep(1:nrow(simulation_conditions), each = n_rep), ]
 # time_df$prevalence = NULL
@@ -246,6 +218,17 @@ setDT(simulation_conditions)
 #     write.csv(runs, "runs.csv", row.names = FALSE)
 #   })
 
+# ################################################################################
+# ########################## RANDOM ASSIGNMENT  ##################################
+# ################################################################################
+source("./random_assignment.R")
+
+data_files = list.files("./data", pattern = "_participants\\.csv$",
+                         full.names = TRUE, recursive = TRUE)
+
+generate_random_assignments(data_files,
+                            output_dir = "./results_data/model_assignments/random",
+                            seed = initial_seed)
 
 # ################################################################################
 # ########################## CLASSIFICATION PERFORMANCES #########################
@@ -257,10 +240,11 @@ data_files = list.files("./data", pattern = "_participants\\.csv$", full.names =
 
 # Define the file path to the assignments
 method_dirs = list(
-  bf_ps = "./results_data/model_assignments/bf_ps",
-  psis = "./results_data/model_assignments/PSIS-LOO",
-  waic = "./results_data/model_assignments/WAIC",
-  hbi = "./results_data/model_assignments/hbi"
+  bf_ps  = "./results_data/model_assignments/bf_ps",
+  psis   = "./results_data/model_assignments/PSIS-LOO",
+  waic   = "./results_data/model_assignments/WAIC",
+  hbi    = "./results_data/model_assignments/hbi",
+  random = "./results_data/model_assignments/random"  
 )
 
 performance_df = data.frame()
@@ -273,6 +257,7 @@ for (true_path in data_files) {
   base_core = sub("_participants\\.csv$", "", basename(true_path))
   message("Calculating metrics for the file: ", true_path)
 
+  # Find the strategy assignment files using method directories and true data file
   for (method_name in names(method_dirs)) {
     predicted_path = file.path(
       method_dirs[[method_name]], seed_name,
@@ -302,11 +287,13 @@ for (true_path in data_files) {
 
       all_labels = c(all_labels, list(labs))
     } else {
+      # Report missing data files to see which method was not run on which files
       message("Missing file: ", predicted_path)
     }
   }
 }
 
+# Merge the collected labels
 all_labels_df = bind_rows(all_labels)
 
 # #################################################################################
@@ -314,16 +301,8 @@ all_labels_df = bind_rows(all_labels)
 # #################################################################################
 source("./parameter.R")
 
-# param_info = list(
-#   b0 = list(mean = 0, sd = 0.5, a = -Inf, b = Inf),
-#   bint = list(mean = 2.5, sd = 0.75, a = 0, b = Inf),
-#   bext = list(mean = 1.75, sd = 0.5, a = 0.5, b = Inf),
-#   z = list(mean = 1, sd = 0.5, a = 0.3, b = 1.3),
-#   guess = list(mean = 0.5, sd = 0.02, a = 0.4, b = 0.6),
-#   bias1 = list(mean = 0.05, sd = 0.02, a = 0, b = 0.15),
-#   bias2 = list(mean = 0.95, sd = 0.02, a = 0.85, b = 1)
-# )
-
+# Find all the simulated data files
+data_files = list.files("./data", pattern = "_participants\\.csv$", full.names = TRUE, recursive = TRUE)
 
 # For now, we ignore models of non-interest and focus on 4 models of interest
 # Mapping of which models uses which parameters
@@ -383,11 +362,11 @@ for (true_path in data_files) {
 
     result = tryCatch(
       calculate_param_metrics(
-        true_data_path        = true_path,
+        true_data_path = true_path,
         predicted_assign_path = predicted_path,
-        param_path            = param_path,
-        method_name           = method_name,
-        param_mapping         = param_mapping
+        param_path = param_path,
+        method_name = method_name,
+        param_mapping = param_mapping
       ),
       error = function(e) {
         message("  ERROR in ", method_name, " / ", base_core, ": ", e$message)
@@ -402,11 +381,6 @@ params_df = bind_rows(all_params)
 
 if (!dir.exists("./metrics")) dir.create("./metrics", recursive = TRUE)
 write.csv(params_df, "./metrics/params_all.csv", row.names = FALSE)
-
-# df = calculate_param_metrics(true_data_path = "./data/1234/150_180_equal_participants.csv",
-#                                 predicted_assign_path = "./model_assignments/hbi/1234/150_180_equal_strategy_assignments.csv",
-#                                 param_path = "./parameter_estimates/hbi/1234",
-#                                 param_mapping = param_mapping)
 
 # ################################################################################
 # ########################## VISUALISATIONS ######################################
@@ -427,33 +401,31 @@ lapply(metrics, function(m) {
 })
 
 # Heatmap for confusion matrix of classifications
-visualise_cm(all_labels_df,
+visualise_cm(all_labels_df = all_labels_df %>% filter(method != "random"),
   output_dir = "./figures/cm_plots",
   by_condition = TRUE,
   overall = TRUE
 )
 
-# Scatter plot for parameter estimates
-scatter_params(params_df, output_dir = "./figures/params")
+params_df = read.csv("./metrics/params_all.csv")
+bar_param_plot(params_df, metric = "rmse", mode = "all", width = 16, height = 8)
+bar_param_plot(params_df, metric = "rmse", mode = "by_model", width = 10, height = 6)
+bar_param_plot(params_df, metric = "rmse", mode = "avg_model", width = 12, height = 6)
 
-bar_rmse(params_df, width = 16, height = 8)
+bar_param_plot(params_df, metric = "bias", mode = "all", width = 20, height = 10)
+bar_param_plot(params_df, metric = "bias", mode = "by_model", width = 14, height = 8)
+bar_param_plot(params_df, metric = "bias", mode = "avg_model", width = 14, height = 8)
 
-bar_rmse_by_model(params_df, width = 10, height = 6)
-
-bar_rmse_avg_model(params_df, width = 12, height = 6)
-
-bar_bias(params_df, width = 16, height = 8)
-
-bar_bias_by_model(params_df, width = 10, height = 6)
-
-bar_bias_avg_model(params_df, width = 12, height = 6)
+# ##################################################################################
+# ####################### NUMERICAL SUMMARIES #######################################
+# ##################################################################################
 
 params_df %>%
   mutate(param_label = paste0(model, "-", param_name)) %>%
   group_by(prevalence, n_participants, n_items, method, param_label) %>%
   summarise(
-    mean_rmse = round(mean(rmse, na.rm = TRUE), 3),
-    sd_rmse = round(sd(rmse, na.rm = TRUE), 3),
+    mean_rmse = round(mean(rmse, na.rm = TRUE), 2),
+    sd_rmse = round(sd(rmse, na.rm = TRUE), 2),
     .groups = "drop"
   ) %>%
   arrange(prevalence, n_participants, n_items, param_label, method) %>%
@@ -468,22 +440,58 @@ params_df %>%
   ) %>%
   print(n = Inf)
 
+params_df %>% 
+  group_by(method) %>%
+  summarise(
+    mean_rmse = round(mean(rmse, na.rm = TRUE), 2),
+    sd_rmse = round(sd(rmse, na.rm = TRUE), 2),
+    .groups = "drop"
+  ) %>%
+  print(n = Inf)
+
 performance_df %>%
   group_by(prevalence, n_participants, n_items, method) %>%
   summarise(
-    mean_accuracy = round(mean(accuracy, na.rm = TRUE), 3),
-    sd_accuracy = round(sd(accuracy, na.rm = TRUE), 3),
-    mean_precision = round(mean(precision, na.rm = TRUE), 3),
-    sd_precision = round(sd(precision, na.rm = TRUE), 3),
-    mean_recall = round(mean(recall, na.rm = TRUE), 3),
-    sd_recall = round(sd(recall, na.rm = TRUE), 3),
-    mean_f1 = round(mean(f1, na.rm = TRUE), 3),
-    sd_f1 = round(sd(f1, na.rm = TRUE), 3),
+    mean_accuracy = round(mean(accuracy, na.rm = TRUE), 2),
+    sd_accuracy = round(sd(accuracy, na.rm = TRUE), 2),
+    mean_precision = round(mean(precision, na.rm = TRUE), 2),
+    sd_precision = round(sd(precision, na.rm = TRUE), 2),
+    mean_recall = round(mean(recall, na.rm = TRUE), 2),
+    sd_recall = round(sd(recall, na.rm = TRUE), 2),
+    mean_f1 = round(mean(f1, na.rm = TRUE), 2),
+    sd_f1 = round(sd(f1, na.rm = TRUE), 2),
     .groups = "drop"
   ) %>%
   arrange(prevalence, n_participants, n_items, method) %>%
   print(n = Inf, width = Inf)
 
+overall_results = all_labels_df %>%
+  mutate(
+    true = factor(true),
+    predicted = factor(predicted, levels = levels(true))
+  ) %>%
+  group_by(method) %>%
+  summarise(
+    cm = list(
+      confusionMatrix(
+        data = predicted,
+        reference = true,
+        mode = "prec_recall"
+      )
+    ),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    overall_accuracy = map_dbl(cm, ~ .x$overall["Accuracy"]),
+    mean_precision = map_dbl(cm, ~ mean(.x$byClass[, "Precision"], na.rm = TRUE)),
+    mean_recall = map_dbl(cm, ~ mean(.x$byClass[, "Recall"], na.rm = TRUE)),
+    mean_f1 = map_dbl(cm, ~ mean(.x$byClass[, "F1"], na.rm = TRUE))
+  ) %>%
+  mutate(across(c(overall_accuracy, mean_precision, mean_recall, mean_f1), 
+                ~ round(.x, 2))) %>%
+  select(method, overall_accuracy, mean_precision, mean_recall, mean_f1)
+
+print(overall_results, width = Inf)
 
 classification_results = all_labels_df %>%
   mutate(
@@ -519,7 +527,6 @@ classification_results = all_labels_df %>%
       })
 
       bc$class_accuracy = class_acc
-
       bc
     })
   ) %>%
@@ -541,3 +548,18 @@ classification_results = all_labels_df %>%
   )
 
 print(classification_results, n = Inf, width = Inf)
+
+# ##########################################################################################
+# ############################## EMPIRICAL STUDY ##########################################
+# ##########################################################################################
+
+# empirical_data = "./data/empirical_data_merged.csv"
+
+# bf_ps(
+#       data_file = empirical_data,
+#       jags_text = "./JAGS_models/JAGS_hierarchical.txt",
+#       n_iter    = 20000,
+#       n_burnin  = 5000,
+#       n_thin    = 100,
+#       jags_seed = initial_seed
+#     )

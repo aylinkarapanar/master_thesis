@@ -18,6 +18,8 @@ bf_ps = function(data_file,
 
   seed_name = basename(dirname(data_file))  
   
+  if (seed_name == "data") seed_name = "empirical"
+
   output_roots = c(
     parameter_estimates = "./parameter_estimates/product_space",
     model_assignments = "./model_assignments/bf_ps",
@@ -139,30 +141,75 @@ bf_ps = function(data_file,
     return(core_name)
   }
   
-  output_base = make_output_base(data_file)
+  is_empirical = grepl("empirical", data_file)
+
+  if (is_empirical) {
+    output_base = "empirical"
+    n_participant = NA
+    n_items = NA
+    prevalence_type = "empirical"
+
+  } else {
+
+    output_base = make_output_base(data_file)
+    parts = str_split(output_base, "_")[[1]]
+
+    n_participant = as.numeric(parts[1])
+    n_items = as.numeric(parts[2]) / 3
+    prevalence_type = parts[3]
+  }
+#   output_base = make_output_base(data_file)
   
-  parts = str_split(output_base, "_")[[1]]
+#   parts = str_split(output_base, "_")[[1]]
   
-  n_participant = as.numeric(parts[1])
-  n_items = as.numeric(parts[2]) / 3
-  prevalence_type = parts[3]
-  #params_type     = parts[4]
+#   n_participant = as.numeric(parts[1])
+#   n_items = as.numeric(parts[2]) / 3
+#   prevalence_type = parts[3]
+#   #params_type     = parts[4]
   
   time_df = read.csv("./runtime/runtime_bf_ps.csv")
+  if (is_empirical) {
 
-   row_index = which(
-   time_df$n_participant  == n_participant &
-   time_df$n_items == n_items &
-   time_df$prevalence_type == prevalence_type &
-   time_df$seed == seed_name
-   # & time_df$params_type == params_type
- )
-
-  time_df[row_index, "total_runtime"] = runtime
-  time_df[row_index, "no_of_cores"] = get_cpu()$no_of_cores
-  time_df[row_index, "name"] = get_cpu()$model_name
-
+    new_row = data.frame(
+    n_participant    = NA,
+    n_items          = NA,
+    prevalence_type  = "empirical",
+    seed             = seed_name,
+    total_runtime    = runtime,
+    no_of_cores      = get_cpu()$no_of_cores,
+    name             = get_cpu()$model_name,
+    stringsAsFactors = FALSE
+  )
+  
+  time_df = rbind(time_df, new_row)
   write.csv(time_df, time_data_file, row.names = FALSE)
+  
+  message("Empirical runtime:")
+  print(new_row)
+  
+  } else {
+
+    row_index = which(
+      time_df$n_participant == n_participant &
+      time_df$n_items == n_items &
+      time_df$prevalence_type == prevalence_type &
+      time_df$seed == seed_name
+    )
+  }
+
+#    row_index = which(
+#    time_df$n_participant  == n_participant &
+#    time_df$n_items == n_items &
+#    time_df$prevalence_type == prevalence_type &
+#    time_df$seed == seed_name
+#    # & time_df$params_type == params_type
+#  )
+
+#   time_df[row_index, "total_runtime"] = runtime
+#   time_df[row_index, "no_of_cores"] = get_cpu()$no_of_cores
+#   time_df[row_index, "name"] = get_cpu()$model_name
+
+#   write.csv(time_df, time_data_file, row.names = FALSE)
 
   # Save parameter estimates
   write.csv(

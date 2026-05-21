@@ -37,6 +37,9 @@ get_labels = function(true_data_path,
             strat_labels = factor(predicted_strategy, levels = 1:7)
         )
         
+        } else if (method_name == "random") {
+            predicted_labels = read.csv(predicted_data_path) %>%
+            mutate(strat_labels = factor(strat_labels, levels = 1:7))
         } else {
             predicted_raw = read.csv(predicted_data_path)
 
@@ -97,20 +100,13 @@ make_metrics_df = function(true_data_path,
     base = str_remove(base, "_participants\\.csv$")
     parts = str_split(base, "_")[[1]]
     
-    n_participant  = as.numeric(parts[1])
-    n_items        = as.numeric(parts[2]) / 3
+    n_participant = as.numeric(parts[1])
+    n_items = as.numeric(parts[2]) / 3
     prevalence_type = parts[3]
-    params_type     = parts[4]
+    params_type = parts[4]
     
     # Load the labels
     labels = get_labels(true_data_path, predicted_data_path, method_name)
-    
-    # Confusion matrix
-    # cm = confusionMatrix(
-    #     data = labels$strat_labels,
-    #     reference = labels$strat_labels,
-    #     mode = "prec_recall"
-    # )
     
     cm = confusionMatrix(
         data = labels$predicted,

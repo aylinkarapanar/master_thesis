@@ -11,21 +11,23 @@ source("./parameter.R")
 
 
 # Define color mapping
-oi = palette_okabeito(palette = "full")(4)
+oi = palette_okabeito(palette = "full")(5)
 
 method_colors = c(
   bf_ps = oi[1],
-  psis  = oi[2],
-  waic  = oi[3],
-  hbi   = oi[4]
+  hbi = oi[4],
+  psis = oi[2],
+  waic = oi[3]
+#  random = oi[5]
 )
 
 method_labels = c(
   # bf_ps = "BF estimation with PS",
   bf_ps = "BFPS",
-  psis  = "PSIS-LOO",
-  waic  = "WAIC",
-  hbi   = "HBI"
+  psis = "PSIS-LOO",
+  waic = "WAIC",
+  hbi = "HBI"
+# random = "Random"
 )
 
 plot_metric = function(data_path = "./metrics/metrics_all.csv",
@@ -34,7 +36,8 @@ plot_metric = function(data_path = "./metrics/metrics_all.csv",
                         width = 9,
                         height = 8) {
   # Load data
-  df = read.csv(data_path)
+  df = read.csv(data_path)  %>% 
+    filter(method != "random")
 
   # Check whether the metric exists
   if (!metric %in% c("accuracy", "precision", "recall", "f1")) {
@@ -57,7 +60,7 @@ plot_metric = function(data_path = "./metrics/metrics_all.csv",
       # Rename the facet grid axes
       labeller = labeller(
         prevalence = c("equal" = "Equal Prevalence", "extreme" = "Extreme Prevalence"),
-        n_items = c("60" = "60 Items Per Condition", "120" = "120 Items Per Condition")
+        n_items = c("60" = "180 Items","120" = "360 Items")
       )
     ) +
     # Adjust the range of y axis
@@ -169,8 +172,8 @@ visualise_cm = function(all_labels_df,
               "extreme" = "Extreme Prevalence"
             ),
             n_items = c(
-              "60" = "60 Items",
-              "120" = "120 Items"
+              "60" = "180 Items",
+              "120" = "360 Items"
             ),
             n_participants = c(
               "150" = "N = 150",
@@ -180,8 +183,8 @@ visualise_cm = function(all_labels_df,
         ) +
         labs(
           # title = paste("Confusion Matrices for", full_label),
-          x = "Predicted strategy",
-          y = "True strategy"
+          x = "Predicted strategy model",
+          y = "True strategy model"
         ) +
         theme_bw(base_size = 14) +
         theme(
@@ -222,8 +225,8 @@ visualise_cm = function(all_labels_df,
         scale_y_discrete(limits = rev) +
         labs(
           # title = paste("Overall Confusion Matrix for", full_label),
-          x = "Predicted strategy",
-          y = "True strategy"
+          x = "Predicted strategy model",
+          y = "True strategy model"
         ) +
         theme_bw(base_size = 16) +
         theme(
@@ -244,581 +247,289 @@ visualise_cm = function(all_labels_df,
   }
 }
 
-# source("./parameter.R")
 
-# # For now ignore models of non-interest
-# param_mapping = list(
-#     "internal" = list(
-#         "model_number" = 1,
-#         "params" = c("b0", "bint")
-#     ),
-#     "external" = list(
-#         "model_number" = 2,
-#         "params" = c("bext")
-#     ),
-#     "sequential" = list(
-#         "model_number" = 3,
-#         "params" = c("b0", "bint", "bext", "z")
-#     ),
-#     "integrative" = list(
-#         "model_number" = 4,
-#         "params" = c("b0", "bint", "bext")
-#     )
-# )
+bar_param_plot = function(
+  params_df,
+  metric = c("rmse", "bias"),
+  mode = c("all", "by_model", "avg_model"),
+  output_dir = "./figures/params",
+  width = 14,
+  height = 8
+) {
 
-# param_info = list(
-#   b0   = list(mean = 0,    sd = 0.5,  a = -Inf, b = Inf),
-#   bint = list(mean = 2.5,  sd = 0.75, a = 0,    b = Inf),
-#   bext = list(mean = 1.75, sd = 0.5,  a = 0.5,  b = Inf),
-#   z    = list(mean = 1,    sd = 0.5,  a = 0.3,  b = 1.3),
-#   guess= list(mean = 0.5,  sd = 0.02, a = 0.4,  b = 0.6),
-#   bias1= list(mean = 0.05, sd = 0.02, a = 0,    b = 0.15),
-#   bias2= list(mean = 0.95, sd = 0.02, a = 0.85, b = 1)
-# )
-
-# # TESTS
-# df = calculate_param_metrics(true_data_path = "./data/1234/150_180_equal_participants.csv",
-#                                 predicted_assign_path = "./results_data/model_assignments/hbi/1234/150_180_equal_strategy_assignments.csv",
-#                                 param_path = "./results_data/parameter_estimates/hbi/1234",
-#                                 param_mapping = param_mapping,
-#                                 method_name = "hbi")
-
-# df = calculate_param_metrics(true_data_path = "./data/1234/150_180_equal_participants.csv",
-#                                 predicted_assign_path = "./results_data/model_assignments/PSIS-LOO/1234/150_180_equal_strategy_assignments.csv",
-#                                 param_path = "./results_data/parameter_estimates/non_hierarchical/PSIS-LOO/1234",
-#                                 param_mapping = param_mapping,
-#                                 method_name = "psis")
-
-# param_path = "./results_data/parameter_estimates/non_hierarchical/PSIS-LOO/1234/150_180_equal_internal.csv"
-# model_params = c("b0", "bint")
-
-# result = get_params_data(param_path, method_name = "psis", model_params = model_params)
-
-# param_path = "./results_data/parameter_estimates/product_space/1234/150_180_equal_params.csv"
-# predicted_assign_path = "./results_data/model_assignments/posterior_prob/1234/150_180_equal_strategy_assignments.csv"
-# model_params = c("b0", "bint")
-
-# result = get_params_data(param_path, predicted_assign_path = predicted_assign_path, method_name = "ps", model_params = model_params)
-
-bar_rmse = function(params_df,
-                     output_dir = "./figures/params",
-                     width = 14,
-                     height = 8) {
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-  df = params_df %>%
-    mutate(
-      param_label = paste0(model, "-", param_name),
-      method = factor(method, levels = names(method_colors))
-    ) %>%
-    group_by(n_participants, n_items, prevalence, method, model, param_label) %>%
-    summarise(
-      mean_rmse = mean(rmse, na.rm = TRUE),
-      se_rmse = sd(rmse, na.rm = TRUE) / sqrt(n()),
-      .groups = "drop"
-    )
+
   model_order = c("internal", "external", "sequential", "integrative")
-  param_order = df %>%
-    distinct(model, param_label) %>%
-    mutate(model = factor(model, levels = model_order)) %>%
-    arrange(model, param_label) %>%
-    pull(param_label)
-  df$param_label = factor(df$param_label, levels = param_order)
-  p = ggplot(df, aes(x = param_label, y = mean_rmse, fill = method)) +
-    geom_col(
-      position = position_dodge(width = 0.8),
-      width = 0.7
-    ) +
-    geom_errorbar(
-      aes(
-        ymin = mean_rmse - se_rmse,
-        ymax = mean_rmse + se_rmse
-      ),
-      position = position_dodge(width = 0.8),
-      width = 0.25,
-      linewidth = 0.5
-    ) +
-    geom_vline(
-      xintercept = which(!duplicated(gsub("-.*", "", param_order)))[-1] - 0.5,
-      linetype = "dashed",
-      colour = "grey60",
-      linewidth = 0.4
-    ) +
-    facet_grid(
-      prevalence ~ n_items + n_participants,
-      labeller = labeller(
-        prevalence = c(
-          "equal" = "Equal Prevalence",
-          "extreme" = "Extreme Prevalence"
-        ),
-        n_items = c(
-          "60" = "60 Items",
-          "120" = "120 Items"
-        ),
-        n_participants = c(
-          "150" = "N = 150",
-          "300" = "N = 300"
-        )
-      )
-    ) +
-    scale_fill_manual(
-      values = method_colors,
-      labels = method_labels
-    ) +
-    labs(
-      title = "Parameter Recovery RMSE by Method and Parameter",
-      x = "Parameter",
-      y = "Mean RMSE",
-      fill = "Method"
-    ) +
-    theme_bw() +
-    theme(
-      plot.title = element_text(face = "bold", hjust = 0.5),
-      strip.text = element_text(face = "bold"),
-      axis.text.x = element_text(angle = 40, hjust = 1, size = 9),
-      legend.position = "right",
-      panel.grid.major.x = element_blank()
-    )
-  ggsave(
-    filename = file.path(output_dir, "bar_rmse.png"),
-    plot = p,
-    width = width,
-    height = height,
-    dpi = 300
+  facet_labeller = labeller(
+    prevalence = c("equal" = "Equal Prevalence", "extreme" = "Extreme Prevalence"),
+    n_items = c("60" = "180 Items", "120" = "360 Items"),
+    n_participants = c("150" = "N = 150", "300" = "N = 300")
   )
-}
-
-bar_bias = function(params_df,
-                     output_dir = "./figures/params",
-                     width = 14,
-                     height = 8) {
-  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
   df = params_df %>%
     mutate(
-      bias = predicted_value - true_value,
-      param_label = paste0(model, "-", param_name),
-      method = factor(method, levels = names(method_colors))
-    ) %>%
-    group_by(n_participants, n_items, prevalence, method, model, param_label) %>%
-    summarise(
-      mean_bias = mean(bias, na.rm = TRUE),
-      se_bias = sd(bias, na.rm = TRUE) / sqrt(n()),
-      .groups = "drop"
+      method = factor(method, levels = names(method_colors)),
+      .value = if (metric == "bias") predicted_value - true_value else rmse
     )
 
-  model_order = c("internal", "external", "sequential", "integrative")
+  # If mode is average by model, summarise the metric
+  if (mode == "avg_model") {
+    df = df %>%
+      group_by(n_participants, n_items, prevalence, method, model) %>%
+      summarise(mean_val = mean(.value, na.rm = TRUE),
+                se_val = sd(.value, na.rm = TRUE) / sqrt(n()),
+                .groups = "drop") %>%
+      mutate(model = factor(model, levels = model_order))
+    x_var   = "model"
+    x_label = "Model"
+    x_angle = 30
+    x_size  = 12
+  } else {
+    df = df %>%
+      mutate(param_label = paste0(model, "-", param_name)) %>%
+      group_by(n_participants, n_items, prevalence, method, model, param_label) %>%
+      summarise(mean_val = mean(.value, na.rm = TRUE),
+                se_val = sd(.value, na.rm = TRUE) / sqrt(n()),
+                .groups = "drop")
+    x_var   = "param_label"
+    x_label = "Parameter"
+    x_angle = 40
+    x_size  = 12
+  }
 
-  param_order = df %>%
-    distinct(model, param_label) %>%
-    mutate(model = factor(model, levels = model_order)) %>%
-    arrange(model, param_label) %>%
-    pull(param_label)
+  y_label = if (metric == "rmse") "Mean RMSE" else "Mean Bias"
+  file_prefix = paste0("bar_", metric)
+  base_size = if (metric == "bias" && mode != "by_model") 14 else 12
 
-  df$param_label = factor(df$param_label, levels = param_order)
+  # Define a function to build the plot
+  make_plot = function(data) {
+    param_order = NULL
 
-  p = ggplot(df, aes(x = param_label, y = mean_bias, fill = method)) +
-    geom_col(
-      position = position_dodge(width = 0.8),
-      width = 0.7
-    ) +
-    geom_errorbar(
-      aes(
-        ymin = mean_bias - se_bias,
-        ymax = mean_bias + se_bias
-      ),
-      position = position_dodge(width = 0.8),
-      width = 0.25,
-      linewidth = 0.5
-    ) +
-    geom_hline(
-      yintercept = 0,
-      linewidth = 0.7,
-      colour = "grey20"
-    ) +
-    geom_vline(
-      xintercept = which(!duplicated(gsub("-.*", "", param_order)))[-1] - 0.5,
-      linetype = "dashed",
-      colour = "grey60",
-      linewidth = 0.4
-    ) +
-    facet_grid(
-      prevalence ~ n_items + n_participants,
-      labeller = labeller(
-        prevalence = c(
-          "equal" = "Equal Prevalence",
-          "extreme" = "Extreme Prevalence"
-        ),
-        n_items = c(
-          "60" = "60 Items",
-          "120" = "120 Items"
-        ),
-        n_participants = c(
-          "150" = "N = 150",
-          "300" = "N = 300"
-        )
-      )
-    ) +
-    scale_fill_manual(
-      values = method_colors,
-      labels = method_labels
-    ) +
-    scale_y_continuous(expand = expansion(mult = c(0.1, 0.1))) +
-    labs(
-      # title = "Parameter Recovery Bias by Method and Parameter",
-      x = "Parameter",
-      y = "Mean Bias",
-      fill = "Method"
-    ) +
-    theme_bw(base_size = 16) +
-    theme(
-      plot.title = element_text(face = "bold", hjust = 0.5),
-      strip.text = element_text(face = "bold"),
-      axis.text.x = element_text(angle = 40, hjust = 1, size = 9),
-      legend.position = "right",
-      panel.grid.major.x = element_blank(),
-      axis.text = element_text(size = 16),
-      axis.title = element_text(size = 18),
-      legend.text = element_text(size = 13),
-      legend.title = element_text(size = 16),
-    )
+    if (mode != "avg_model") {
+      param_order = data %>%
+        distinct(model, param_label) %>%
+        mutate(model = factor(model, levels = model_order)) %>%
+        arrange(model, param_label) %>%
+        pull(param_label)
+      data$param_label = factor(data$param_label, levels = param_order)
+    }
 
-  ggsave(
-    filename = file.path(output_dir, "bar_bias.png"),
-    plot = p,
-    width = width,
-    height = height,
-    dpi = 300
-  )
-}
-
-
-bar_rmse_by_model = function(params_df,
-                              output_dir = "./figures/params",
-                              width = 14,
-                              height = 8) {
-  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-
-  model_order = c("internal", "external", "sequential", "integrative")
-
-  df = params_df %>%
-    mutate(
-      param_label = paste0(model, "-", param_name),
-      method = factor(method, levels = names(method_colors))
-    ) %>%
-    group_by(n_participants, n_items, prevalence, method, model, param_label) %>%
-    summarise(
-      mean_rmse = mean(rmse, na.rm = TRUE),
-      se_rmse = sd(rmse, na.rm = TRUE) / sqrt(n()),
-      .groups = "drop"
-    )
-
-  for (m in model_order) {
-    df_model = df %>% filter(model == m)
-
-    if (nrow(df_model) == 0) next
-
-    param_order = df_model %>%
-      distinct(param_label) %>%
-      arrange(param_label) %>%
-      pull(param_label)
-
-    df_model$param_label = factor(df_model$param_label, levels = param_order)
-
-    p = ggplot(df_model, aes(x = param_label, y = mean_rmse, fill = method)) +
+    p = ggplot(data, aes(x = .data[[x_var]], y = mean_val, fill = method)) +
       geom_col(position = position_dodge(width = 0.8), width = 0.7) +
       geom_errorbar(
-        aes(ymin = mean_rmse - se_rmse, ymax = mean_rmse + se_rmse),
+        aes(ymin = mean_val - se_val, ymax = mean_val + se_val),
         position = position_dodge(width = 0.8),
         width = 0.25,
         linewidth = 0.5
-      ) +
-      facet_grid(
-        prevalence ~ n_items + n_participants,
-        labeller = labeller(
-          prevalence = c("equal" = "Equal Prevalence", "extreme" = "Extreme Prevalence"),
-          n_items = c("60" = "60 Items", "120" = "120 Items"),
-          n_participants = c("150" = "N = 150", "300" = "N = 300")
-        )
-      ) +
+      )
+
+    if (metric == "bias") {
+      p = p + geom_hline(yintercept = 0, linewidth = 0.7, colour = "grey20")
+    }
+
+    if (mode == "all" && !is.null(param_order)) {
+      p = p + geom_vline(
+        xintercept = which(!duplicated(gsub("-.*", "", param_order)))[-1] - 0.5,
+        linetype = "dashed",
+        colour = "grey60",
+        linewidth = 0.4
+      )
+    }
+
+    # Y axis scale for a given mode and metric
+    p = p + switch(paste(metric, mode),
+      "rmse by_model" = scale_y_continuous(limits = c(0, 1.7), breaks = seq(0, 1.7, 0.2)),
+      "bias by_model" = scale_y_continuous(limits = c(-1.5, 0.7), breaks = seq(-1.5, 0.7, 0.2),
+                                           expand = expansion(mult = c(0.1, 0.1))),
+      "bias all" = scale_y_continuous(expand = expansion(mult = c(0.1, 0.1))),
+      "bias avg_model"= scale_y_continuous(expand = expansion(mult = c(0.1, 0.1))),
+      NULL
+    )
+
+    p +
+      facet_grid(prevalence ~ n_items + n_participants, labeller = facet_labeller) +
       scale_fill_manual(values = method_colors, labels = method_labels) +
-      scale_y_continuous(
-        limits = c(0, 1.7),
-        breaks = seq(0, 1.7, 0.2)
-      ) +
-      labs(
-        # title = paste("Parameter Recovery RMSE —", tools::toTitleCase(m), "Model"),
-        x = "Parameter",
-        y = "Mean RMSE",
-        fill = "Method"
-      ) +
-      theme_bw(base_size = 14) +
+      labs(x = x_label, y = y_label, fill = "Method") +
+      theme_bw(base_size = base_size) +
       theme(
-        plot.title = element_text(face = "bold", hjust = 0.5),
         strip.text = element_text(face = "bold"),
-        axis.text.x = element_text(angle = 40, hjust = 1, size = 9),
+        axis.text.x = element_text(angle = x_angle, hjust = 1, size = x_size),
         legend.position = "right",
         panel.grid.major.x = element_blank(),
-        axis.text = element_text(size = 14),
-        axis.title = element_text(size = 16),
+        axis.text = element_text(size = base_size),
+        axis.title = element_text(size = base_size + 2),
         legend.text = element_text(size = 13),
-        legend.title = element_text(size = 14),
+        legend.title = element_text(size = base_size)
       )
-      
+  }
 
+  if (mode == "by_model") {
+    for (m in model_order) {
+      df_model = df %>% filter(model == m)
+      if (nrow(df_model) == 0) next
+      ggsave(
+        filename = file.path(output_dir, paste0(file_prefix, "_", m, ".png")),
+        plot = make_plot(df_model),
+        width = width, height = height, dpi = 300
+      )
+    }
+  } else {
+    filename = if (mode == "avg_model") paste0(file_prefix, "_avg_model.png") else paste0(file_prefix, ".png")
     ggsave(
-      filename = file.path(output_dir, paste0("bar_rmse_", m, ".png")),
-      plot = p,
-      width = width,
-      height = height,
-      dpi = 300
+      filename = file.path(output_dir, filename),
+      plot = make_plot(df),
+      width = width, height = height, dpi = 300
     )
   }
 }
 
-bar_bias_by_model = function(params_df,
-                              output_dir = "./figures/params",
-                              width = 14,
-                              height = 8) {
+bar_param_plot = function(
+  params_df,
+  metric = c("rmse", "bias"),
+  mode = c("all", "by_model", "avg_model"),
+  output_dir = "./figures/params",
+  width = 14,
+  height = 8
+) {
+
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
   model_order = c("internal", "external", "sequential", "integrative")
+  facet_labeller = labeller(
+    prevalence = c("equal" = "Equal Prevalence", "extreme" = "Extreme Prevalence"),
+    n_items = c("60" = "180 Items", "120" = "360 Items"),
+    n_participants = c("150" = "N = 150", "300" = "N = 300")
+  )
 
   df = params_df %>%
     mutate(
-      bias = predicted_value - true_value,
-      param_label = paste0(model, "-", param_name),
-      method = factor(method, levels = names(method_colors))
-    ) %>%
-    group_by(n_participants, n_items, prevalence, method, model, param_label) %>%
-    summarise(
-      mean_bias = mean(bias, na.rm = TRUE),
-      se_bias = sd(bias, na.rm = TRUE) / sqrt(n()),
-      .groups = "drop"
+      method = factor(method, levels = names(method_colors)),
+      .value = if (metric == "bias") predicted_value - true_value else rmse
     )
 
-  for (m in model_order) {
-    df_model = df %>% filter(model == m)
+  if (metric == "rmse") {
+    if (mode == "avg_model") {
+      df = df %>%
+        group_by(n_participants, n_items, prevalence, method, model) %>%
+        summarise(mean_val = mean(.value, na.rm = TRUE),
+                  se_val = sd(.value, na.rm = TRUE) / sqrt(n()),
+                  .groups = "drop") %>%
+        mutate(model = factor(model, levels = model_order))
+    } else {
+      df = df %>%
+        mutate(param_label = paste0(model, "-", param_name)) %>%
+        group_by(n_participants, n_items, prevalence, method, model, param_label) %>%
+        summarise(mean_val = mean(.value, na.rm = TRUE),
+                  se_val = sd(.value, na.rm = TRUE) / sqrt(n()),
+                  .groups = "drop")
+    }
+  } else {
+    # bias: always keep raw values; set up grouping vars only
+    if (mode == "avg_model") {
+      df = df %>% mutate(model = factor(model, levels = model_order))
+    } else {
+      df = df %>% mutate(param_label = paste0(model, "-", param_name))
+    }
+  }
 
-    if (nrow(df_model) == 0) next
+  if (mode == "avg_model") {
+    x_var   = "model"
+    x_label = "Model"
+    x_angle = 30
+    x_size  = 12
+  } else {
+    x_var   = "param_label"
+    x_label = "Parameter"
+    x_angle = 40
+    x_size  = 12
+  }
 
-    param_order = df_model %>%
-      distinct(param_label) %>%
-      arrange(param_label) %>%
-      pull(param_label)
+  y_label   = if (metric == "rmse") "Mean RMSE" else "Bias"
+  file_prefix = paste0("bar_", metric)
+  base_size = if (metric == "bias" && mode != "by_model") 14 else 12
 
-    df_model$param_label = factor(df_model$param_label, levels = param_order)
+  make_plot = function(data) {
+    param_order = NULL
 
-    p = ggplot(df_model, aes(x = param_label, y = mean_bias, fill = method)) +
-      geom_col(position = position_dodge(width = 0.8), width = 0.7) +
-      geom_errorbar(
-        aes(ymin = mean_bias - se_bias, ymax = mean_bias + se_bias),
-        position = position_dodge(width = 0.8),
-        width = 0.25,
-        linewidth = 0.5
-      ) +
-      geom_hline(yintercept = 0, linewidth = 0.7, colour = "grey20") +
-      facet_grid(
-        prevalence ~ n_items + n_participants,
-        labeller = labeller(
-          prevalence = c("equal" = "Equal Prevalence", "extreme" = "Extreme Prevalence"),
-          n_items = c("60" = "60 Items", "120" = "120 Items"),
-          n_participants = c("150" = "N = 150", "300" = "N = 300")
+    if (mode != "avg_model") {
+      param_order = data %>%
+        distinct(model, param_label) %>%
+        mutate(model = factor(model, levels = model_order)) %>%
+        arrange(model, param_label) %>%
+        pull(param_label)
+      data$param_label = factor(data$param_label, levels = param_order)
+    }
+
+    if (metric == "rmse") {
+      p = ggplot(data, aes(x = .data[[x_var]], y = mean_val, fill = method)) +
+        geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+        geom_errorbar(
+          aes(ymin = mean_val - se_val, ymax = mean_val + se_val),
+          position = position_dodge(width = 0.8),
+          width = 0.25,
+          linewidth = 0.5
         )
-      ) +
+    } else {
+      p = ggplot(data, aes(x = .data[[x_var]], y = .value, fill = method)) +
+        geom_boxplot(
+          position = position_dodge(width = 0.8),
+          width = 0.7,
+          outlier.size = 0.8,
+          outlier.alpha = 0.5
+        ) +
+        geom_hline(yintercept = 0, linewidth = 0.7, colour = "grey60", linetype = "dashed")
+    }
+
+    if (mode == "all" && !is.null(param_order)) {
+      p = p + geom_vline(
+        xintercept = which(!duplicated(gsub("-.*", "", param_order)))[-1] - 0.5,
+        linetype = "dashed",
+        colour = "grey60",
+        linewidth = 0.4
+      )
+    }
+
+    p = p + switch(paste(metric, mode),
+      "rmse by_model"  = scale_y_continuous(limits = c(0, 1.7), breaks = seq(0, 1.7, 0.2)),
+      "bias by_model"  = scale_y_continuous(limits = c(-6, 6), breaks = seq(-6, 6, 1), expand = expansion(mult = c(0.1, 0.1))),
+      "bias all"       = scale_y_continuous(limits = c(-6, 6), breaks = seq(-6, 6, 1), expand = expansion(mult = c(0.1, 0.1))),
+      "bias avg_model" = scale_y_continuous(limits = c(-6, 6), breaks = seq(-6, 6, 1), expand = expansion(mult = c(0.1, 0.1))),
+      NULL
+    )
+
+    p +
+      facet_grid(prevalence ~ n_items + n_participants, labeller = facet_labeller) +
       scale_fill_manual(values = method_colors, labels = method_labels) +
-      scale_y_continuous(
-        limits = c(-1.5, 0.7),
-        breaks = seq(-1.5, 0.7, 0.2),
-        expand = expansion(mult = c(0.1, 0.1))
-      ) +
-      labs(
-        # title = paste("Parameter Recovery Bias —", tools::toTitleCase(m), "Model"),
-        x = "Parameter",
-        y = "Mean Bias",
-        fill = "Method"
-      ) +
-      theme_bw(base_size = 14) +
+      labs(x = x_label, y = y_label, fill = "Method") +
+      theme_bw(base_size = base_size) +
       theme(
-        plot.title = element_text(face = "bold", hjust = 0.5),
         strip.text = element_text(face = "bold"),
-        axis.text.x = element_text(angle = 40, hjust = 1, size = 9),
+        axis.text.x = element_text(angle = x_angle, hjust = 1, size = x_size),
         legend.position = "right",
         panel.grid.major.x = element_blank(),
-        axis.text = element_text(size = 14),
-        axis.title = element_text(size = 16),
+        axis.text = element_text(size = base_size),
+        axis.title = element_text(size = base_size + 2),
         legend.text = element_text(size = 13),
-        legend.title = element_text(size = 14),
+        legend.title = element_text(size = base_size)
       )
+  }
 
+  if (mode == "by_model") {
+    for (m in model_order) {
+      df_model = df %>% filter(model == m)
+      if (nrow(df_model) == 0) next
+      ggsave(
+        filename = file.path(output_dir, paste0(file_prefix, "_", m, ".png")),
+        plot = make_plot(df_model),
+        width = width, height = height, dpi = 300
+      )
+    }
+  } else {
+    filename = if (mode == "avg_model") paste0(file_prefix, "_avg_model.png") else paste0(file_prefix, ".png")
     ggsave(
-      filename = file.path(output_dir, paste0("bar_bias_", m, ".png")),
-      plot = p,
-      width = width,
-      height = height,
-      dpi = 300
+      filename = file.path(output_dir, filename),
+      plot = make_plot(df),
+      width = width, height = height, dpi = 300
     )
   }
-}
-
-bar_rmse_avg_model = function(params_df,
-                               output_dir = "./figures/params",
-                               width = 14,
-                               height = 8) {
-  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-
-  df = params_df %>%
-    mutate(method = factor(method, levels = names(method_colors))) %>%
-    group_by(n_participants, n_items, prevalence, method, model) %>%
-    summarise(
-      mean_rmse = mean(rmse, na.rm = TRUE),
-      se_rmse   = sd(rmse, na.rm = TRUE) / sqrt(n()),
-      .groups   = "drop"
-    ) %>%
-    mutate(model = factor(model, levels = c("internal", "external", "sequential", "integrative")))
-
-  p = ggplot(df, aes(x = model, y = mean_rmse, fill = method)) +
-    geom_col(
-      position = position_dodge(width = 0.8),
-      width = 0.7
-    ) +
-    geom_errorbar(
-      aes(
-        ymin = mean_rmse - se_rmse,
-        ymax = mean_rmse + se_rmse
-      ),
-      position = position_dodge(width = 0.8),
-      width = 0.25,
-      linewidth = 0.5
-    ) +
-    facet_grid(
-      prevalence ~ n_items + n_participants,
-      labeller = labeller(
-        prevalence = c(
-          "equal"   = "Equal Prevalence",
-          "extreme" = "Extreme Prevalence"
-        ),
-        n_items = c(
-          "60"  = "60 Items",
-          "120" = "120 Items"
-        ),
-        n_participants = c(
-          "150" = "N = 150",
-          "300" = "N = 300"
-        )
-      )
-    ) +
-    scale_fill_manual(
-      values = method_colors,
-      labels = method_labels
-    ) +
-    labs(
-      x    = "Model",
-      y    = "Mean RMSE",
-      fill = "Method"
-    ) +
-    theme_bw(base_size = 14) +
-    theme(
-      strip.text = element_text(face = "bold"),
-      axis.text.x = element_text(angle = 30, hjust = 1, size = 10),
-      legend.position = "right",
-      panel.grid.major.x = element_blank(),
-      axis.text = element_text(size = 14),
-      axis.title = element_text(size = 16),
-      legend.text = element_text(size = 13),
-      legend.title = element_text(size = 14),
-    )
-
-  ggsave(
-    filename = file.path(output_dir, "bar_rmse_avg_model.png"),
-    plot     = p,
-    width    = width,
-    height   = height,
-    dpi      = 300
-  )
-}
-
-bar_bias_avg_model = function(params_df,
-                              output_dir = "./figures/params",
-                              width = 14,
-                              height = 8) {
-  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-
-  df = params_df %>%
-    mutate(
-      bias   = predicted_value - true_value,
-      method = factor(method, levels = names(method_colors))
-    ) %>%
-    group_by(n_participants, n_items, prevalence, method, model) %>%
-    summarise(
-      mean_bias = mean(bias, na.rm = TRUE),
-      se_bias   = sd(bias, na.rm = TRUE) / sqrt(n()),
-      .groups   = "drop"
-    ) %>%
-    mutate(model = factor(model, levels = c("internal", "external", "sequential", "integrative")))
-
-  p = ggplot(df, aes(x = model, y = mean_bias, fill = method)) +
-    geom_col(
-      position = position_dodge(width = 0.8),
-      width = 0.7
-    ) +
-    geom_errorbar(
-      aes(
-        ymin = mean_bias - se_bias,
-        ymax = mean_bias + se_bias
-      ),
-      position = position_dodge(width = 0.8),
-      width = 0.25,
-      linewidth = 0.5
-    ) +
-    geom_hline(
-      yintercept = 0,
-      linewidth  = 0.7,
-      colour     = "grey20"
-    ) +
-    facet_grid(
-      prevalence ~ n_items + n_participants,
-      labeller = labeller(
-        prevalence = c(
-          "equal"   = "Equal Prevalence",
-          "extreme" = "Extreme Prevalence"
-        ),
-        n_items = c(
-          "60"  = "60 Items",
-          "120" = "120 Items"
-        ),
-        n_participants = c(
-          "150" = "N = 150",
-          "300" = "N = 300"
-        )
-      )
-    ) +
-    scale_fill_manual(
-      values = method_colors,
-      labels = method_labels
-    ) +
-    scale_y_continuous(expand = expansion(mult = c(0.1, 0.1))) +
-    labs(
-      x    = "Model",
-      y    = "Mean Bias",
-      fill = "Method"
-    ) +
-    theme_bw(base_size = 16) +
-    theme(
-      strip.text      = element_text(face = "bold"),
-      axis.text.x     = element_text(angle = 30, hjust = 1, size = 10),
-      legend.position = "right",
-      panel.grid.major.x = element_blank(),
-      axis.text       = element_text(size = 16),
-      axis.title      = element_text(size = 18),
-      legend.text     = element_text(size = 13),
-      legend.title    = element_text(size = 16)
-    )
-
-  ggsave(
-    filename = file.path(output_dir, "bar_bias_avg_model.png"),
-    plot     = p,
-    width    = width,
-    height   = height,
-    dpi      = 300
-  )
 }
