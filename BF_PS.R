@@ -144,7 +144,7 @@ bf_ps = function(data_file,
   is_empirical = grepl("empirical", data_file)
 
   if (is_empirical) {
-    output_base = "empirical"
+    output_base = "empirical_data_merged"
     n_participant = NA
     n_items = NA
     prevalence_type = "empirical"

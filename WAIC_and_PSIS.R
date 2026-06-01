@@ -1,4 +1,3 @@
-# TODO: make the csv naming for the params consistent with the hbi 
 packages = c("R2jags", "loo", "dplyr", "stringr", "benchmarkme", "see")
 
 if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
@@ -79,7 +78,9 @@ model_selection_waic_loo = function(data_file,
                                     jags_seed = 1234,
                                     time_data_file = "./runtime/runtime_waic_loo.csv") {
   
-  seed_name = basename(dirname(data_file))  
+  seed_name = basename(dirname(data_file)) 
+
+   if (seed_name == "data") seed_name = "empirical" 
 
   output_roots = c(
     params_loo = "./parameter_estimates/non_hierarchical/PSIS-LOO",
@@ -98,8 +99,9 @@ model_selection_waic_loo = function(data_file,
   })
 
   data_long = read.csv(data_file) %>%
-    arrange(., ID)
-  
+    mutate(ID = as.integer(factor(ID))) %>%
+    arrange(ID)
+    
   participant_ranges = data_long %>%
     mutate(row_id = row_number()) %>%   
     group_by(ID) %>%
@@ -169,14 +171,23 @@ model_selection_waic_loo = function(data_file,
     return(core_name)
   }
   
-  output_base = make_output_base(data_file)
-  
-  parts = str_split(output_base, "_")[[1]]
-  
-  n_participant = as.numeric(parts[1])
-  n_items = as.numeric(parts[2]) / 3
-  prevalence_type = parts[3]
-  #params_type     = parts[4]
+    is_empirical = grepl("empirical", data_file)
+
+  if (is_empirical) {
+    output_base = "empirical"
+    n_participant = NA
+    n_items = NA
+    prevalence_type = "empirical"
+
+  } else {
+
+    output_base = make_output_base(data_file)
+    parts = str_split(output_base, "_")[[1]]
+
+    n_participant = as.numeric(parts[1])
+    n_items = as.numeric(parts[2]) / 3
+    prevalence_type = parts[3]
+  }
 
   write.csv(
     looic_strat,
@@ -543,15 +554,49 @@ model_selection_waic_loo = function(data_file,
 
   time_df = read.csv(time_data_file)
 
-  row_index = which(
-    time_df$n_participant  == n_participant &
-    time_df$n_items == n_items &
-    time_df$prevalence_type == prevalence_type &
-    time_df$seed == seed_name
-    #time_df$params_type == params_type
-  )
-  
-  if (length(row_index) > 0) {
+  if (is_empirical) {
+
+    new_row = data.frame(
+      n_participant = NA,
+      n_items = NA,
+      prevalence_type = "empirical",
+      seed = seed_name,
+
+      no_of_cores = get_cpu()$no_of_cores,
+      name = get_cpu()$model_name,
+
+      total_runtime_assign = sum(runtime_vector),
+      total_runtime_refit_loo = sum(runtime_refit_loo),
+      total_runtime_refit_waic = sum(runtime_refit_waic),
+
+      stringsAsFactors = FALSE
+    )
+
+
+    for (i in seq_along(model_list)) {
+
+      new_row[[paste0(names(model_list)[i], "_assign")]] =
+        runtime_vector[i]
+
+      new_row[[paste0(names(model_list)[i], "_refit_loo")]] =
+        runtime_refit_loo[i]
+
+      new_row[[paste0(names(model_list)[i], "_refit_waic")]] =
+        runtime_refit_waic[i]
+    }
+
+    time_df = rbind(time_df, new_row)
+
+  } else {
+
+    row_index = which(
+      time_df$n_participant == n_participant &
+      time_df$n_items == n_items &
+      time_df$prevalence_type == prevalence_type &
+      time_df$seed == seed_name
+    )
+
+    if (length(row_index) > 0) {
     time_df[row_index, "no_of_cores"] = get_cpu()$no_of_cores
     time_df[row_index, "name"] = get_cpu()$model_name
 
@@ -563,8 +608,8 @@ model_selection_waic_loo = function(data_file,
 
     time_df[row_index, "total_runtime_refit_loo"] = sum(runtime_refit_loo)
     time_df[row_index, "total_runtime_refit_waic"] = sum(runtime_refit_waic)
-}
-  
-  write.csv(time_df, time_data_file, row.names = FALSE)
+    }
 
+  write.csv(time_df, time_data_file, row.names = FALSE)
+  }
 }

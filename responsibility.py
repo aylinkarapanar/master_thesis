@@ -4,13 +4,12 @@ import pickle
 from pathlib import Path
 from scipy.special import expit
 from cbm.individual_fit import individual_fit
-from cbm.model_selection import bms
 from cbm.optimization import Config
-from cbm.hbi import hbi_main, hbi_null
+from cbm.hbi import hbi_main
 import sys
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
-import os
+# from concurrent.futures import ProcessPoolExecutor, as_completed
+# import os
 import cpuinfo
 
 
@@ -108,8 +107,17 @@ PRIOR_MEANS = [
     np.array([0.9]),
 ]
 
-PRIOR_VARIANCE = 10
+#PRIOR_VARIANCE = 10
 
+PRIOR_VARIANCE = [
+    np.array([1.0, 1.0]),            
+    np.array([1.0]),                 
+    np.array([1.0, 1.0, 1.0, (1/6)**2]), 
+    np.array([1.0, 1.0, 1.0]),      
+    np.array([0.01]),                
+    np.array([0.01]),                
+    np.array([0.01]),               
+]
 
 configs = [
     Config(
@@ -136,34 +144,32 @@ configs = [
 
 def make_output_base(data_file):
     p = Path(data_file)
+    if "empirical" in p.stem:
+        return "empirical", p.stem   # seed_name="empirical", base=filename stem
     return p.parts[1], Path(*p.parts[2:]).name.replace("_data.csv", "")
 
 
 def parse_metadata(data_file):
     p = Path(data_file)
-
+    if "empirical" in p.stem:
+        return None, None, "empirical", "empirical"
     seed = int(p.parts[1])
     name = p.stem.replace("_data", "")
     parts = name.split("_")
-
-    n_participant = int(parts[0])
-    n_items = int(parts[1])
-    prevalence_type = parts[2]
-
-    return n_participant, n_items, prevalence_type, seed
+    return int(parts[0]), int(parts[1]), parts[2], seed
 
 
 def run_hbi_for_file(data_file):
-
     seed_file, output_base = make_output_base(data_file)
+    n_participant, n_items, prevalence_type, seed = parse_metadata(data_file)
 
     PARAM_DIR = Path(f"./parameter_estimates/hbi/{seed_file}")
     ASSIGN_DIR = Path(f"./model_assignments/hbi/{seed_file}")
-    PROB_DIR = Path(f"./model_assignments/hbi/prob_strat/{seed_file}")
+    PROB_DIR   = Path(f"./model_assignments/hbi/prob_strat/{seed_file}")
+    OUT_DIR    = Path(f"./hbi_output/{seed_file}/{output_base}")
 
-    PARAM_DIR.mkdir(parents=True, exist_ok=True)
-    ASSIGN_DIR.mkdir(parents=True, exist_ok=True)
-    PROB_DIR.mkdir(parents=True, exist_ok=True)
+    for d in [PARAM_DIR, ASSIGN_DIR, PROB_DIR, OUT_DIR]:
+        d.mkdir(parents=True, exist_ok=True)
 
     n_participant, n_items, prevalence_type, seed = parse_metadata(data_file)
     df = pd.read_csv(data_file)
@@ -184,11 +190,11 @@ def run_hbi_for_file(data_file):
     start_time = time.time()
 
 
-    for k, (model, prior_mean, name, config) in enumerate(
-        zip(MODELS, PRIOR_MEANS, MODEL_NAMES, configs), start=1
+    for k, (model, prior_mean, prior_var, name, config) in enumerate(
+        zip(MODELS, PRIOR_MEANS, PRIOR_VARIANCE, MODEL_NAMES, configs), start=1
     ):
         cbm_k = individual_fit(
-            all_data, model, prior_mean, PRIOR_VARIANCE, config=config
+            all_data, model, prior_mean, prior_var, config=config
         )
         path_k = OUT_DIR / f"cbm_m{k}.pkl"
         with open(path_k, "wb") as f:
@@ -271,78 +277,131 @@ def main(data_files, runs_file="runs.csv"):
         else:
             files_to_run.append(f)
 
-    n_cores = os.cpu_count() - 2
+    # n_cores = os.cpu_count() - 2
+    # machine_name = cpuinfo.get_cpu_info()['brand_raw']
+
+    # log_rows = []
+
+    # print(f"Running {len(files_to_run)} file(s) on {n_cores} core(s)")
+
+    # with ProcessPoolExecutor(max_workers=n_cores) as executor:
+    #     futures = [executor.submit(run_hbi_for_file, f) for f in files_to_run]
+
+    #     for future in as_completed(futures):
+    #         try:
+    #             res = future.result()
+    #         except Exception as e:
+    #             print(f"Worker failed: {e}")
+    #             continue
+            
+    #         f = res["data_file"]
+
+    #         print(f"Finished {f} in {res['total_runtime']:.2f}s")
+
+    #         res["no_of_cores"] = n_cores
+    #         res["name"] = machine_name
+
+    #         log_rows.append(
+    #             {
+    #                 "n_participant": res["n_participant"],
+    #                 "n_items": int(res["n_items"] / 3),
+    #                 "prevalence_type": str(res["prevalence_type"]),
+    #                 "seed": res["seed"],
+    #                 "total_runtime": res["total_runtime"],
+    #                 "no_of_cores": n_cores,
+    #                 "name": str(machine_name),
+    #             }
+    #         )
+
+    #         f_clean = "./" + str(Path(f))
+            
+    #         # Update runs.csv
+    #         if f_clean in runs["file"].values:
+    #             runs.loc[runs["file"] == f_clean, "hbi"] = True
+    #         else:
+    #             runs = pd.concat(
+    #                 [
+    #                     runs,
+    #                     pd.DataFrame(
+    #                         [
+    #                             {
+    #                                 "file": f_clean,
+    #                                 "posterior_prob": pd.NA,
+    #                                 "waic": pd.NA,
+    #                                 "loo": pd.NA,
+    #                                 "hbi": True,
+    #                             }
+    #                         ]
+    #                     ),
+    #                 ],
+    #                 ignore_index=True,
+    #             )
+    #         runs.to_csv(runs_file, index=False)
+    #         print(f"Updated {runs_file}")
+    #         log_file = "./runtime/runtime_hbi.csv"
+
+    #         new_row_df = pd.DataFrame([log_rows[-1]])
+
+    #         if Path(log_file).exists():
+    #             existing = pd.read_csv(log_file)
+    #             new_row_df = pd.concat([existing, new_row_df], ignore_index=True)
+
+    #         new_row_df.to_csv(log_file, index=False)
+
+    #         print(f"Saved runtime log to {log_file}")
+
+    n_cores      = 1
     machine_name = cpuinfo.get_cpu_info()['brand_raw']
+    log_rows     = []
 
-    log_rows = []
+    print(f"Running {len(files_to_run)} file(s) sequentially")
 
-    print(f"Running {len(files_to_run)} file(s) on {n_cores} core(s)")
+    for f in files_to_run:
+        try:
+            res = run_hbi_for_file(f)
+        except Exception as e:
+            print(f"Failed {f}: {e}")
+            continue
 
-    with ProcessPoolExecutor(max_workers=n_cores) as executor:
-        futures = [executor.submit(run_hbi_for_file, f) for f in files_to_run]
+        print(f"Finished {f} in {res['total_runtime']:.2f}s")
 
-        for future in as_completed(futures):
-            try:
-                res = future.result()
-            except Exception as e:
-                print(f"Worker failed: {e}")
-                continue
-            
-            f = res["data_file"]
+        log_rows.append({
+            "n_participant":  res["n_participant"],
+            "n_items":        int(res["n_items"] / 3) if res["n_items"] else None,
+            "prevalence_type": str(res["prevalence_type"]),
+            "seed":           res["seed"],
+            "total_runtime":  res["total_runtime"],
+            "no_of_cores":    n_cores,
+            "name":           str(machine_name),
+        })
 
-            print(f"Finished {f} in {res['total_runtime']:.2f}s")
+        f_clean = "./" + str(Path(f))
 
-            res["no_of_cores"] = n_cores
-            res["name"] = machine_name
+        if f_clean in runs["file"].values:
+            runs.loc[runs["file"] == f_clean, "hbi"] = True
+        else:
+            runs = pd.concat([
+                runs,
+                pd.DataFrame([{
+                    "file": f_clean,
+                    "posterior_prob": pd.NA,
+                    "waic": pd.NA,
+                    "loo": pd.NA,
+                    "hbi": True,
+                }])
+            ], ignore_index=True)
 
-            log_rows.append(
-                {
-                    "n_participant": res["n_participant"],
-                    "n_items": int(res["n_items"] / 3),
-                    "prevalence_type": str(res["prevalence_type"]),
-                    "seed": res["seed"],
-                    "total_runtime": res["total_runtime"],
-                    "no_of_cores": n_cores,
-                    "name": str(machine_name),
-                }
-            )
+        runs.to_csv(runs_file, index=False)
+        print(f"Updated {runs_file}")
 
-            f_clean = "./" + str(Path(f))
-            
-            # Update runs.csv
-            if f_clean in runs["file"].values:
-                runs.loc[runs["file"] == f_clean, "hbi"] = True
-            else:
-                runs = pd.concat(
-                    [
-                        runs,
-                        pd.DataFrame(
-                            [
-                                {
-                                    "file": f_clean,
-                                    "posterior_prob": pd.NA,
-                                    "waic": pd.NA,
-                                    "loo": pd.NA,
-                                    "hbi": True,
-                                }
-                            ]
-                        ),
-                    ],
-                    ignore_index=True,
-                )
-            runs.to_csv(runs_file, index=False)
-            print(f"Updated {runs_file}")
-            log_file = "./runtime/runtime_hbi.csv"
+        log_file    = "./runtime/runtime_hbi.csv"
+        new_row_df  = pd.DataFrame([log_rows[-1]])
 
-            new_row_df = pd.DataFrame([log_rows[-1]])
+        if Path(log_file).exists():
+            new_row_df = pd.concat([pd.read_csv(log_file), new_row_df], ignore_index=True)
 
-            if Path(log_file).exists():
-                existing = pd.read_csv(log_file)
-                new_row_df = pd.concat([existing, new_row_df], ignore_index=True)
-
-            new_row_df.to_csv(log_file, index=False)
-
-            print(f"Saved runtime log to {log_file}")
+        new_row_df.to_csv(log_file, index=False)
+        print(f"Saved runtime log to {log_file}")
 
 
 if __name__ == "__main__":
@@ -359,7 +418,8 @@ if __name__ == "__main__":
             data_files.append(str(p))
 
         elif p.is_dir():
-            files = sorted(p.rglob("*data.csv"))
+            files = sorted(p.rglob("*data.csv")) + sorted(p.rglob("*data_merged.csv"))
+            files = sorted(set(files))
             if not files:
                 print(f"No matching files in {arg}")
             data_files.extend([str(f) for f in files])

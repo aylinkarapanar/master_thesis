@@ -1,4 +1,4 @@
-packages = c("caret", "stringr", "DescTools", "bayestestR")
+packages = c("caret", "stringr", "DescTools", "bayestestR", "reticulate")
 lapply(packages, library, character.only = TRUE)
 
 if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
@@ -8,36 +8,7 @@ if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
 lapply(packages, library, character.only = TRUE)
 
 source("./metrics.R")
-
-# For now ignore models of non-interest
-param_mapping = list(
-  "internal" = list(
-    "model_number" = 1,
-    "params" = c("b0", "bint")
-  ),
-  "external" = list(
-    "model_number" = 2,
-    "params" = c("bext")
-  ),
-  "sequential" = list(
-    "model_number" = 3,
-    "params" = c("b0", "bint", "bext", "z")
-  ),
-  "integrative" = list(
-    "model_number" = 4,
-    "params" = c("b0", "bint", "bext")
-  )
-)
-
-param_info = list(
-  b0 = list(mean = 0, sd = 0.5, a = -Inf, b = Inf),
-  bint = list(mean = 2.5, sd = 0.75, a = 0, b = Inf),
-  bext = list(mean = 1.75, sd = 0.5, a = 0.5, b = Inf),
-  z = list(mean = 1, sd = 0.5, a = 0.3, b = 1.3),
-  guess = list(mean = 0.5, sd = 0.02, a = 0.4, b = 0.6),
-  bias1 = list(mean = 0.05, sd = 0.02, a = 0, b = 0.15),
-  bias2 = list(mean = 0.95, sd = 0.02, a = 0.85, b = 1)
-)
+source_python("eat_the_pickle.py")
 
 # get_samples = function(method_name, param_path, base, model_number, model_label, model_params, i) {
 #   if (method_name == "hbi") {
@@ -94,7 +65,6 @@ get_bf_ps_params = function(data, predicted_assign_path, model_params) {
   return(params_data)
 }
 
-
 # Helper function to process csv files with parameter values
 get_params_data = function(params_file, predicted_assign_path = NULL, method_name, model_params) {
   data = read.csv(params_file, header = TRUE)
@@ -122,7 +92,6 @@ get_params_data = function(params_file, predicted_assign_path = NULL, method_nam
       params_data[index_part[k], param_part[k]] = means[k]
     }
   } else if (method_name == "bf_ps") {
-    # separate function would be better to keep it clean here
     params_data = get_bf_ps_params(data, predicted_assign_path, model_params)
   }
 
@@ -198,8 +167,8 @@ calculate_param_metrics = function(true_data_path,
         #                           model_number, model_label, model_params, i)
         # if (is.null(samples_data)) next
 
-        # # Get the column for this participant x parameter
-        # col = paste0(param_name, "[", i, "]")
+        # Get the column for this participant x parameter
+        col = paste0(param_name, "[", i, "]")
         # if (!(col %in% colnames(samples_data))) next
         # samples = samples_data[[col]]
         # samples = samples[!is.na(samples)]
@@ -236,3 +205,197 @@ calculate_param_metrics = function(true_data_path,
   return(results_df)
 }
 
+error = function(e) {
+  message("  ERROR in ", method_name, " / ", base_core, ": ", e$message)
+  data.frame()
+}
+
+calculate_group_params = function(true_param_list,
+                                  param_path,        
+                                  method_name,
+                                  param_mapping,
+                                  base_core = NULL,
+                                  n_samples = 1000) {
+  results = list()
+
+  if (method_name == "hbi") {
+    file_path   = file.path(param_path, paste0(base_core,  "_full_output.pkl"))
+    pickle_data = eat_the_pickle(file_path)
+    mean_list   = pickle_data$group_mean
+
+    est_data = lapply(names(param_mapping), function(model_name) {
+      model_idx = param_mapping[[model_name]]$model_number
+      params    = param_mapping[[model_name]]$params
+      means     = as.numeric(mean_list[[model_idx]])
+      df        = as.data.frame(matrix(means, nrow = 1))
+      colnames(df) = params
+      df
+    })
+    names(est_data) = names(param_mapping)
+
+  } else if (method_name == "bf_ps") {
+    param_df = read.csv(param_path)  
+
+    est_data = lapply(names(param_mapping), function(model_name) {
+      params    = param_mapping[[model_name]]$params
+      col_names = paste0(params, "mean")
+      cols      = col_names[col_names %in% colnames(param_df)]
+      if (length(cols) == 0) return(list())
+      df = as.data.frame(as.list(colMeans(param_df[, cols, drop = FALSE], na.rm = TRUE)))
+      colnames(df) = params[col_names %in% colnames(param_df)]
+      df
+    })
+    names(est_data) = names(param_mapping)
+
+  } else if (method_name %in% c("waic", "psis")) {
+    est_data = lapply(names(param_mapping), function(model_name) {
+      suppressWarnings(tryCatch({
+        file_path = file.path(param_path, paste0(base_core, "_", model_name, ".csv"))
+        param_df  = read.csv(file_path)
+        params    = param_mapping[[model_name]]$params
+        col_names = paste0(params, "mean")
+        cols      = col_names[col_names %in% colnames(param_df)]
+        if (length(cols) == 0) return(list())
+        df = as.data.frame(as.list(colMeans(param_df[, cols, drop = FALSE], na.rm = TRUE)))
+        colnames(df) = params[col_names %in% colnames(param_df)]
+        df
+      }, error = function(e) {
+        message(sprintf("  Skipping model '%s': no file found", model_name))
+        list()
+      }))
+    })
+    names(est_data) = names(param_mapping)
+
+  } else {
+    stop(sprintf("Unknown method_name: '%s'", method_name))
+  }
+
+  for (model_name in names(param_mapping)) {
+    if (!(model_name %in% names(est_data)))        next
+    if (!(model_name %in% names(true_param_list))) next
+    est_vals  = est_data[[model_name]]
+    true_vals = true_param_list[[model_name]]
+    if (length(est_vals) == 0) next
+
+    for (param in names(true_vals)) {
+      if (!(param %in% colnames(est_vals))) next
+      pred = as.numeric(est_vals[[param]])
+      true = as.numeric(true_vals[[param]])
+      results[[length(results) + 1]] = data.frame(
+        # seed            = seed_name,
+        # n_participants  = n_participant,
+        # n_items         = n_items,
+        # prevalence      = prevalence_type,
+        method          = method_name,
+        model           = model_name,
+        param_name      = param,
+        true_value      = true,
+        predicted_value = pred,
+        rmse            = sqrt((pred - true)^2),
+        bias            = pred - true
+      )
+    }
+  }
+
+  if (length(results) == 0) return(data.frame())
+  do.call(rbind, results)
+}
+
+calculate_group_params = function(true_param_list,
+                                  param_path,
+                                  method_name,
+                                  param_mapping,
+                                  base_core = NULL,
+                                  seed_name = NULL,
+                                  n_samples = 1000) {
+  results = list()
+
+  # Parse metadata from base_core the same way as calculate_param_metrics
+  parts           = str_split(base_core, "_")[[1]]
+  n_participant   = as.numeric(parts[1])
+  n_items         = as.numeric(parts[2]) / 3
+  prevalence_type = parts[3]
+  seed_name       = if (is.null(seed_name)) NA_character_ else seed_name
+
+  if (method_name == "hbi") {
+    file_path   = file.path(param_path, paste0(base_core, "_full_output.pkl"))
+    pickle_data = eat_the_pickle(file_path)
+    mean_list   = pickle_data$group_mean
+
+    est_data = lapply(names(param_mapping), function(model_name) {
+      model_idx = param_mapping[[model_name]]$model_number
+      params    = param_mapping[[model_name]]$params
+      means     = as.numeric(mean_list[[model_idx]])
+      df        = as.data.frame(matrix(means, nrow = 1))
+      colnames(df) = params
+      df
+    })
+    names(est_data) = names(param_mapping)
+
+  } else if (method_name == "bf_ps") {
+    param_df = read.csv(param_path)
+
+    est_data = lapply(names(param_mapping), function(model_name) {
+      params    = param_mapping[[model_name]]$params
+      col_names = paste0(params, "mean")
+      cols      = col_names[col_names %in% colnames(param_df)]
+      if (length(cols) == 0) return(list())
+      df = as.data.frame(as.list(colMeans(param_df[, cols, drop = FALSE], na.rm = TRUE)))
+      colnames(df) = params[col_names %in% colnames(param_df)]
+      df
+    })
+    names(est_data) = names(param_mapping)
+
+  } else if (method_name %in% c("waic", "psis")) {
+    est_data = lapply(names(param_mapping), function(model_name) {
+      suppressWarnings(tryCatch({
+        file_path = file.path(param_path, paste0(base_core, "_", model_name, ".csv"))
+        param_df  = read.csv(file_path)
+        params    = param_mapping[[model_name]]$params
+        col_names = paste0(params, "mean")
+        cols      = col_names[col_names %in% colnames(param_df)]
+        if (length(cols) == 0) return(list())
+        df = as.data.frame(as.list(colMeans(param_df[, cols, drop = FALSE], na.rm = TRUE)))
+        colnames(df) = params[col_names %in% colnames(param_df)]
+        df
+      }, error = function(e) {
+        message(sprintf("  Skipping model '%s': no file found", model_name))
+        list()
+      }))
+    })
+    names(est_data) = names(param_mapping)
+
+  } else {
+    stop(sprintf("Unknown method_name: '%s'", method_name))
+  }
+
+  for (model_name in names(param_mapping)) {
+    if (!(model_name %in% names(est_data)))        next
+    if (!(model_name %in% names(true_param_list))) next
+    est_vals  = est_data[[model_name]]
+    true_vals = true_param_list[[model_name]]
+    if (length(est_vals) == 0) next
+
+    for (param in names(true_vals)) {
+      if (!(param %in% colnames(est_vals))) next
+      pred = as.numeric(est_vals[[param]])
+      true = as.numeric(true_vals[[param]])
+      results[[length(results) + 1]] = data.frame(
+        seed            = seed_name,
+        n_participants  = n_participant,
+        n_items         = n_items,
+        prevalence      = prevalence_type,
+        method          = method_name,
+        model           = model_name,
+        param_name      = param,
+        true_value      = true,
+        predicted_value = pred,
+        rmse            = sqrt((pred - true)^2),
+        bias            = pred - true
+      )
+    }
+  }
+
+  if (length(results) == 0) return(data.frame())
+  do.call(rbind, results)
+}
