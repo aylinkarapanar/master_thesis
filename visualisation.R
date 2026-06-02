@@ -759,7 +759,8 @@ plot_empirical_params = function(
   level,
   output_dir = "./figures/empirical_params",
   width  = 12,
-  height = 8
+  height = 8,
+  psis_waic_name = "empirical_"
 ) {
   
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
@@ -767,7 +768,7 @@ plot_empirical_params = function(
   if (level == "group") {
     
     all_samples = bind_rows(lapply(names(param_dirs), function(method_name) {
-      samples_list = get_group_param_samples(method_name, param_dirs, param_mapping)
+      samples_list = get_group_param_samples(method_name, param_dirs, param_mapping, psis_waic_name = psis_waic_name)
       
       bind_rows(lapply(names(samples_list), function(model_label) {
         df = samples_list[[model_label]]
@@ -782,7 +783,7 @@ plot_empirical_params = function(
           filter(!is.na(value))
       }))
     })) %>%
-      mutate(method = factor(method, levels = names(param_dirs)))
+      mutate(method = factor(method, levels = names(method_colors)))
     
     if (nrow(all_samples) == 0) { message("No group parameter data found."); return(invisible(NULL)) }
     
@@ -790,9 +791,10 @@ plot_empirical_params = function(
         df_model = filter(all_samples, model == m)
         if (nrow(df_model) == 0) next
         
-        p = ggplot(df_model, aes(x = value, y = param, fill = method, color = method)) +
+        p = ggplot(df_model, aes(x = value, y = method, fill = method, color = method)) +
           geom_density_ridges(alpha = 0.5, linewidth = 0.6, scale = 0.9) +
           scale_fill_manual(values = method_colors, labels = method_labels, aesthetics = c("fill", "color")) +
+          scale_y_discrete(labels = method_labels, limits = rev(names(method_colors))) +
           facet_wrap(~ param, scales = "free") +
           labs(x = "Estimate", y = NULL, fill = "Method", color = "Method",
               title = tools::toTitleCase(m)) +
@@ -800,8 +802,7 @@ plot_empirical_params = function(
           theme(
             strip.text     = element_text(face = "bold"),
             legend.position = "right",
-            axis.text.y    = element_blank(),
-            axis.ticks.y   = element_blank()
+            axis.text.y    = element_blank()
           )
         
         ggsave(file.path(output_dir, paste0("group_params_empirical_", m, ".png")),
@@ -842,25 +843,40 @@ plot_empirical_params = function(
         )
       }))
     })) %>%
-      mutate(method = factor(method, levels = names(method_labels)))
+      mutate(method = factor(method, levels = names(method_colors)))
     
     if (nrow(params_df) == 0) { message("No parameter data found."); return(invisible(NULL)) }
     
     for (m in names(param_mapping)) {
       df_model = filter(params_df, model == m)
       if (nrow(df_model) == 0) next
-      
-      p = ggplot(df_model, aes(x = value, fill = method, color = method)) +
-        geom_density(alpha = 0.35, linewidth = 0.6) +
-        scale_fill_brewer(palette = "Set2", labels = method_labels, aesthetics = c("fill", "color")) +
-        facet_wrap(~ param, scales = "free") +
-        labs(x = "Estimate", y = "Density", fill = "Method", color = "Method",
-             title = tools::toTitleCase(m)) +
-        theme_bw(base_size = 14) +
-        theme(strip.text = element_text(face = "bold"), legend.position = "right")
+
+       p = ggplot(df_model, aes(x = value, y = method, fill = method, color = method)) +
+          geom_density_ridges(alpha = 0.5, linewidth = 0.6, scale = 0.9) +
+          scale_fill_manual(values = method_colors, labels = method_labels, aesthetics = c("fill", "color")) +
+          scale_y_discrete(labels = method_labels, limits = rev(names(method_colors))) +
+          facet_wrap(~ param, scales = "free") +
+          labs(x = "Estimate", y = NULL, fill = "Method", color = "Method",
+              title = tools::toTitleCase(m)) +
+          theme_bw(base_size = 14) +
+          theme(
+            strip.text     = element_text(face = "bold"),
+            legend.position = "right",
+            axis.text.y    = element_blank()
+          )
+
+      # p = ggplot(df_model, aes(x = value, fill = method, color = method)) +
+      #   geom_density(alpha = 0.35, linewidth = 0.6) +
+      #   scale_fill_brewer(palette = "Set2", labels = method_labels, aesthetics = c("fill", "color")) +
+      #   facet_wrap(~ param, scales = "free") +
+      #   labs(x = "Estimate", y = "Density", fill = "Method", color = "Method",
+      #        title = tools::toTitleCase(m)) +
+      #   theme_bw(base_size = 14) +
+      #   theme(strip.text = element_text(face = "bold"), legend.position = "right")
       
       ggsave(file.path(output_dir, paste0("params_empirical_", m, ".png")),
              p, width = width, height = height, dpi = 300)
+    
     }
   }
 }

@@ -1,0 +1,162 @@
+model {
+
+##############
+#1. THE MODELS
+
+############################
+#1a. Internal Strategy Model
+
+for ( i in 1:Nobs) {
+theta1[i] <- tmptheta1[i]
+logit(tmptheta1[i]) <- b0[ID[i]] + bint[ID[i]] * diff[i] #parameter
+}
+
+############################
+#1b. External Strategy Model
+
+for ( i in 1:Nobs) {
+theta2[i] <- tmptheta2[i]
+logit(tmptheta2[i]) <- bext[ID[i]] * cue[i]
+
+}
+
+#####################
+#1c. Sequential Model
+
+for (i in 1:Nobs) {
+lb[i] <- step((Mcenter[ID[i]] - z[ID[i]]) - diff[i]) #1 if diff<lower bound external part (i.e. use internal model) parameter
+ub[i] <- step(diff[i] - (Mcenter[ID[i]] + z[ID[i]])) #1 if diff>upper bound external part (i.e. use internal model) parameter
+
+logit(tmptheta31[i]) <- b0[ID[i]] + bint[ID[i]] * diff[i]
+logit(tmptheta32[i]) <- bext[ID[i]] * cue[i]
+
+theta3[i] <- (equals(lb[i], 1) * tmptheta31[i] + equals(ub[i], 1) * tmptheta31[i] + equals(lb[i], 0) * equals(ub[i], 0) * tmptheta32[i])
+}
+
+for(j in 1:n){
+Mcenter[j] <- -(b0[j]  / ifelse(bint[j]==0, 1E-16, bint[j]))
+#if b0[i]=0, then divide by .000001. if b0[i]!=0, Mcenter= -(b0[i]  / bint[i])
+}
+
+
+######################
+#1d. Integrative Model
+
+for ( i in 1:Nobs) {
+theta4[i] <- tmptheta4[i]
+logit(tmptheta4[i]) <- b0[ID[i]] + bint[ID[i]] * diff[i] + bext[ID[i]] * cue[i]
+}
+
+############################
+#1e. Guessing Model (random)
+
+for ( i in 1:Nobs) {
+theta5[i] <- guess[ID[i]]
+}
+
+############################
+#1f. Extreme Model 1 ('lower'/L1 preference)
+
+for ( i in 1:Nobs) {
+theta6[i] <- bias1[ID[i]]
+}
+
+############################
+#1g. Extreme Model 2 ('higher'/L2 preference)
+
+for ( i in 1:Nobs) {
+theta7[i] <- bias2[ID[i]]
+}
+
+####################
+#2a. HYPERPARAMETERS
+
+b0mean ~ dnorm(0, 1/1^2)
+b0sd ~ dunif(.1, 1)
+b0precision <- 1/(b0sd^2)
+
+bintmean ~ dnorm(3, 1/1^2)
+bintsd ~ dunif(.1, 1)
+bintprecision <- 1/(bintsd^2)
+
+bextmean ~ dnorm(3, 1/1^2)T(1,)
+bextsd ~ dunif(.1, 1)
+bextprecision <- 1/(bextsd^2)
+
+zmean ~ dnorm(.85, 1/(1/6)^2)T(.4,)
+zsd ~ dunif(.1, .3)
+zprecision <- 1/(zsd^2)
+
+guessmean ~ dnorm(.5, 1/.1^2)
+guesssd ~ dunif(.1, .3)
+guessprecision <- 1/(guesssd^2)
+
+bias1mean ~ dnorm(0.1, 1/.1^2)
+bias1sd ~ dunif(.1, .3)
+bias1precision <- 1/(bias1sd^2)
+
+bias2mean ~ dnorm( 0.9, 1/.1^2)
+bias2sd ~ dunif(.1, .3)
+bias2precision <- 1/(bias2sd^2)
+
+###############
+#3a. PARAMETERS
+
+for( j in 1:n){ #per participant j
+
+b0[j] ~ dnorm( b0mean, b0precision)
+
+bint[j] ~ dnorm( bintmean, bintprecision)
+
+bext[j]  ~ dnorm( bextmean,  bextprecision )T(1,)
+
+z[j] ~ dnorm(zmean, zprecision)T(.4,)
+#z cant be 0 cause then its just the internal model
+#z cant be 1.73 cause then its just the external model
+
+guess[j] ~ dnorm(guessmean, guessprecision)T(0.40, .60)
+bias1[j] ~ dnorm(bias1mean, bias1precision)T(0, .15)
+bias2[j] ~ dnorm(bias2mean, bias2precision)T(0.85, 1)
+}
+
+#######################
+#4. MODEL PROBABILITIES
+
+#Dirichlet prior to posterior
+for(j in 1:nz) {
+  alpha[j] ~ dgamma(alpha0[j], 1)
+  r[j] <- alpha[j] / sum(alpha[])
+}
+
+
+#Probability strategy (strat) per participant j
+for (j in 1:n){ #per subject
+ strat[j] ~ dcat( r[1:nz] )
+}
+
+
+#Calculate probabilities
+for (i in 1:Nobs){ #per observation i
+probresp[i] <- (equals(strat[ID[i]],1) * theta1[i]) + (equals(strat[ID[i]],2) * theta2[i]) + (equals(strat[ID[i]],3) * theta3[i]) + (equals(strat[ID[i]],4) * theta4[i]) + (equals(strat[ID[i]],5) * theta5[i])
++ (equals(strat[ID[i]],6) * theta6[i]) + (equals(strat[ID[i]],7) * theta7[i]) }
+
+########
+#5. DATA + POSTERIOR PREDICTIVE CHECK
+
+fit <- 0
+fitnew <- 0
+
+for (i in 1:Nobs) {
+
+  mu[i] <- probresp[i]
+
+  resp[i] ~ dbern(mu[i])
+  res[i] <- pow(resp[i] - mu[i], 2)
+  fit <- fit + res[i]
+
+  respnew[i] ~ dbern(mu[i])
+  resnew[i] <- pow(respnew[i] - mu[i], 2)
+  fitnew <- fitnew + resnew[i]
+}
+
+}

@@ -210,95 +210,66 @@ error = function(e) {
   data.frame()
 }
 
-calculate_group_params = function(true_param_list,
-                                  param_path,        
-                                  method_name,
-                                  param_mapping,
-                                  base_core = NULL,
-                                  n_samples = 1000) {
-  results = list()
-
-  if (method_name == "hbi") {
-    file_path   = file.path(param_path, paste0(base_core,  "_full_output.pkl"))
-    pickle_data = eat_the_pickle(file_path)
-    mean_list   = pickle_data$group_mean
-
-    est_data = lapply(names(param_mapping), function(model_name) {
-      model_idx = param_mapping[[model_name]]$model_number
-      params    = param_mapping[[model_name]]$params
-      means     = as.numeric(mean_list[[model_idx]])
-      df        = as.data.frame(matrix(means, nrow = 1))
-      colnames(df) = params
-      df
-    })
-    names(est_data) = names(param_mapping)
-
-  } else if (method_name == "bf_ps") {
-    param_df = read.csv(param_path)  
-
-    est_data = lapply(names(param_mapping), function(model_name) {
+get_group_param_samples = function(method_name,
+                                   param_dirs,
+                                   param_mapping,
+                                   n_samples = 1000,
+                                   psis_waic_name = "empirical_") {
+  
+  param_path = param_dirs[[method_name]]
+  
+  if (method_name == "bf_ps") {
+    param_df = read.csv(param_path)
+    
+    samples_list = lapply(names(param_mapping), function(model_name) {
       params    = param_mapping[[model_name]]$params
       col_names = paste0(params, "mean")
-      cols      = col_names[col_names %in% colnames(param_df)]
-      if (length(cols) == 0) return(list())
-      df = as.data.frame(as.list(colMeans(param_df[, cols, drop = FALSE], na.rm = TRUE)))
-      colnames(df) = params[col_names %in% colnames(param_df)]
+      df        = param_df[, col_names, drop = FALSE]
+      colnames(df) = paste0(params)
       df
     })
-    names(est_data) = names(param_mapping)
-
+    
   } else if (method_name %in% c("waic", "psis")) {
-    est_data = lapply(names(param_mapping), function(model_name) {
+    samples_list = lapply(names(param_mapping), function(model_name) {
       suppressWarnings(tryCatch({
-        file_path = file.path(param_path, paste0(base_core, "_", model_name, ".csv"))
+        file_path = file.path(param_path, paste0(psis_waic_name, model_name, ".csv"))
         param_df  = read.csv(file_path)
         params    = param_mapping[[model_name]]$params
         col_names = paste0(params, "mean")
-        cols      = col_names[col_names %in% colnames(param_df)]
-        if (length(cols) == 0) return(list())
-        df = as.data.frame(as.list(colMeans(param_df[, cols, drop = FALSE], na.rm = TRUE)))
-        colnames(df) = params[col_names %in% colnames(param_df)]
+        df        = param_df[, col_names, drop = FALSE]
+        colnames(df) = paste0(params)
         df
       }, error = function(e) {
-        message(sprintf("  Skipping model '%s': no file found", model_name))
+        message(sprintf("Skipping model '%s': no file found", model_name))
         list()
       }))
     })
-    names(est_data) = names(param_mapping)
-
-  } else {
-    stop(sprintf("Unknown method_name: '%s'", method_name))
-  }
-
-  for (model_name in names(param_mapping)) {
-    if (!(model_name %in% names(est_data)))        next
-    if (!(model_name %in% names(true_param_list))) next
-    est_vals  = est_data[[model_name]]
-    true_vals = true_param_list[[model_name]]
-    if (length(est_vals) == 0) next
-
-    for (param in names(true_vals)) {
-      if (!(param %in% colnames(est_vals))) next
-      pred = as.numeric(est_vals[[param]])
-      true = as.numeric(true_vals[[param]])
-      results[[length(results) + 1]] = data.frame(
-        # seed            = seed_name,
-        # n_participants  = n_participant,
-        # n_items         = n_items,
-        # prevalence      = prevalence_type,
-        method          = method_name,
-        model           = model_name,
-        param_name      = param,
-        true_value      = true,
-        predicted_value = pred,
-        rmse            = sqrt((pred - true)^2),
-        bias            = pred - true
+    
+  } else if (method_name == "hbi") {
+    pickle_data = eat_the_pickle(param_path)
+    mean_list   = pickle_data$group_mean
+    sd_list     = pickle_data$group_hierarchical_errorbar
+    
+    samples_list = lapply(names(param_mapping), function(model_name) {
+      model_info = param_mapping[[model_name]]
+      model_idx  = model_info$model_number
+      params     = model_info$params
+      means      = as.numeric(mean_list[[model_idx]])
+      sds        = as.numeric(sd_list[[model_idx]])
+      
+      df = as.data.frame(
+        mapply(function(mu, sigma) rnorm(n_samples, mean = mu, sd = sigma), means, sds)
       )
-    }
+      colnames(df) = paste0(params)
+      df
+    })
+    
+  } else {
+    stop(sprintf("Unknown method_name: '%s'. Must be one of: 'bf_ps', 'waic', 'psis', 'hbi'.", method_name))
   }
-
-  if (length(results) == 0) return(data.frame())
-  do.call(rbind, results)
+  
+  names(samples_list) = names(param_mapping)
+  return(samples_list)
 }
 
 calculate_group_params = function(true_param_list,
@@ -310,7 +281,6 @@ calculate_group_params = function(true_param_list,
                                   n_samples = 1000) {
   results = list()
 
-  # Parse metadata from base_core the same way as calculate_param_metrics
   parts           = str_split(base_core, "_")[[1]]
   n_participant   = as.numeric(parts[1])
   n_items         = as.numeric(parts[2]) / 3
@@ -380,6 +350,7 @@ calculate_group_params = function(true_param_list,
       if (!(param %in% colnames(est_vals))) next
       pred = as.numeric(est_vals[[param]])
       true = as.numeric(true_vals[[param]])
+      rmse_val = caret::RMSE(pred, true)
       results[[length(results) + 1]] = data.frame(
         seed            = seed_name,
         n_participants  = n_participant,
@@ -390,7 +361,7 @@ calculate_group_params = function(true_param_list,
         param_name      = param,
         true_value      = true,
         predicted_value = pred,
-        rmse            = sqrt((pred - true)^2),
+        rmse            = rmse_val,
         bias            = pred - true
       )
     }

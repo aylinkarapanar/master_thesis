@@ -9,12 +9,12 @@ lapply(packages, library, character.only = TRUE)
 
 
 bf_ps = function(data_file,
-                                 jags_text,
-                                 n_iter = 20000,
-                                 n_burnin = 5000,
-                                 n_thin = 10,
-                                 jags_seed,
-                                 time_data_file = "./runtime/runtime_bf_ps.csv") {
+                jags_text,
+                n_iter = 20000,
+                n_burnin = 5000,
+                n_thin = 10,
+                jags_seed,
+                time_data_file = "./runtime/runtime_bf_ps.csv") {
 
   seed_name = basename(dirname(data_file))  
   
@@ -158,14 +158,6 @@ bf_ps = function(data_file,
     n_items = as.numeric(parts[2]) / 3
     prevalence_type = parts[3]
   }
-#   output_base = make_output_base(data_file)
-  
-#   parts = str_split(output_base, "_")[[1]]
-  
-#   n_participant = as.numeric(parts[1])
-#   n_items = as.numeric(parts[2]) / 3
-#   prevalence_type = parts[3]
-#   #params_type     = parts[4]
   
   time_df = read.csv("./runtime/runtime_bf_ps.csv")
   if (is_empirical) {
@@ -196,20 +188,6 @@ bf_ps = function(data_file,
       time_df$seed == seed_name
     )
   }
-
-#    row_index = which(
-#    time_df$n_participant  == n_participant &
-#    time_df$n_items == n_items &
-#    time_df$prevalence_type == prevalence_type &
-#    time_df$seed == seed_name
-#    # & time_df$params_type == params_type
-#  )
-
-#   time_df[row_index, "total_runtime"] = runtime
-#   time_df[row_index, "no_of_cores"] = get_cpu()$no_of_cores
-#   time_df[row_index, "name"] = get_cpu()$model_name
-
-#   write.csv(time_df, time_data_file, row.names = FALSE)
 
   # Save parameter estimates
   write.csv(
@@ -285,4 +263,6 @@ bf_ps = function(data_file,
 
 
   dev.off()
+
+  return(samples)
 }
