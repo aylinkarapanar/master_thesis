@@ -314,131 +314,197 @@ bar_param_plot = function(params_df,
                           mode = c("all", "by_model", "avg_model"),
                           output_dir = "./figures/params",
                           width = 14,
-                          height = 8
-                          ) {
+                          height = 8) {
 
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
   model_order = c("internal", "external", "sequential", "integrative")
+
+  # Label mapping for x-axis ticks to match the notation in the manuscript
+  param_math = c(
+    "b0"   = "beta[0]",
+    "bext" = "beta[ext]",
+    "bint" = "beta[int]",
+    "z"    = "xi"
+  )
+  model_display = c(
+    "internal"    = "Internal",
+    "external"    = "External",
+    "sequential"  = "Sequential",
+    "integrative" = "Integrative"
+  )
+
   facet_labeller = labeller(
-    prevalence = c("equal" = "Equal Prevalence", "extreme" = "Extreme Prevalence"),
-    n_items = c("60" = "180 Items", "120" = "360 Items"),
+    prevalence     = c("equal" = "Equal Prevalence", "extreme" = "Extreme Prevalence"),
+    n_items        = c("60" = "180 Items", "120" = "360 Items"),
     n_participants = c("150" = "N = 150", "300" = "N = 300")
   )
 
+  # Calculate bias
   df = params_df %>%
     mutate(
       method = factor(method, levels = names(method_colors)),
       .value = if (metric == "bias") predicted_value - true_value else rmse
     )
 
+  # Get rmse ready for plotting
   if (metric == "rmse") {
     if (mode == "avg_model") {
       df = df %>%
         group_by(n_participants, n_items, prevalence, method, model) %>%
         summarise(mean_val = mean(.value, na.rm = TRUE),
-                  se_val = sd(.value, na.rm = TRUE) / sqrt(n()),
-                  .groups = "drop") %>%
+                  se_val   = sd(.value, na.rm = TRUE) / sqrt(n()),
+                  .groups  = "drop") %>%
         mutate(model = factor(model, levels = model_order))
     } else {
       df = df %>%
-        mutate(param_label = paste0(model, "-", param_name)) %>%
-        group_by(n_participants, n_items, prevalence, method, model, param_label) %>%
+        group_by(n_participants, n_items, prevalence, method, model, param_name) %>%
         summarise(mean_val = mean(.value, na.rm = TRUE),
-                  se_val = sd(.value, na.rm = TRUE) / sqrt(n()),
-                  .groups = "drop")
+                  se_val   = sd(.value, na.rm = TRUE) / sqrt(n()),
+                  .groups  = "drop")
     }
   } else {
-    # bias: always keep raw values; set up grouping vars only
     if (mode == "avg_model") {
       df = df %>% mutate(model = factor(model, levels = model_order))
-    } else {
-      df = df %>% mutate(param_label = paste0(model, "-", param_name))
     }
   }
 
+  y_label     = if (metric == "rmse") "Mean RMSE" else "Bias"
+  file_prefix = paste0("bar_", metric)
+  base_size   = if (metric == "bias" && mode != "by_model") 14 else 12
+
+  # Theme specifications
   if (mode == "avg_model") {
-    x_var   = "model"
     x_label = "Model"
     x_angle = 30
     x_size  = 12
   } else {
-    x_var   = "param_label"
     x_label = "Parameter"
     x_angle = 40
     x_size  = 12
   }
 
-  y_label   = if (metric == "rmse") "Mean RMSE" else "Bias"
-  file_prefix = paste0("bar_", metric)
-  base_size = if (metric == "bias" && mode != "by_model") 14 else 12
-
+  # Function to plot the given data
   make_plot = function(data) {
-    param_order = NULL
+    # Name x axis ticks as model name
+    if (mode == "avg_model") {
+      data$model = factor(data$model, levels = model_order)
+      x_col = "model"
+      p_x_scale = scale_x_discrete(labels = model_display)
 
-    if (mode != "avg_model") {
+    } else if (mode == "by_model") {
+      # Name x axis ticks as param notation
       param_order = data %>%
-        distinct(model, param_label) %>%
+        distinct(param_name) %>%
+        arrange(param_name) %>%
+        pull(param_name)
+      data$param_name = factor(data$param_name, levels = param_order)
+
+      tick_map = setNames(
+        sapply(param_order, function(p) if (p %in% names(param_math)) param_math[[p]] else p),
+        param_order
+      )
+      p_x_scale = scale_x_discrete(
+        labels = function(x) parse(text = tick_map[x])
+      )
+      x_col = "param_name"
+
+    } else {
+      data = data %>%
         mutate(model = factor(model, levels = model_order)) %>%
-        arrange(model, param_label) %>%
-        pull(param_label)
-      data$param_label = factor(data$param_label, levels = param_order)
+        arrange(model, param_name) %>%
+        mutate(
+          x_tick_key = paste0(
+            model_display[as.character(model)],
+            "|||",
+            sapply(param_name, function(p) if (p %in% names(param_math)) param_math[[p]] else p)
+          ),
+          x_tick_key = factor(x_tick_key, levels = unique(x_tick_key))
+        )
+      x_col = "x_tick_key"
+ 
+      # Name the x axis ticks as model name - parameter notation
+      tick_levels = levels(data$x_tick_key)
+      tick_map_all = setNames(
+        sapply(tick_levels, function(lbl) {
+          parts      = strsplit(lbl, "\\|\\|\\|")[[1]]
+          model_part = parts[1] 
+          param_part = parts[2]  
+          paste0('"', model_part, '"', "*'-'*", param_part)
+        }),
+        tick_levels
+      )
+      p_x_scale = scale_x_discrete(
+        labels = function(x) parse(text = tick_map_all[x])
+      )
+ 
+      # Dashed vertical lines between models
+      vline_pos = data %>%
+        distinct(model, x_tick_key) %>%
+        group_by(model) %>%
+        summarise(last_pos = max(as.integer(x_tick_key)), .groups = "drop") %>%
+        arrange(last_pos) %>%
+        filter(model != last(model_order[model_order %in% unique(as.character(data$model))])) %>%
+        pull(last_pos)
     }
 
+    # If RMSE plot as errorbar
     if (metric == "rmse") {
-      p = ggplot(data, aes(x = .data[[x_var]], y = mean_val, fill = method)) +
+      p = ggplot(data, aes(x = .data[[x_col]], y = mean_val, fill = method)) +
         geom_col(position = position_dodge(width = 0.8), width = 0.7) +
         geom_errorbar(
           aes(ymin = mean_val - se_val, ymax = mean_val + se_val),
-          position = position_dodge(width = 0.8),
-          width = 0.25,
+          position  = position_dodge(width = 0.8),
+          width     = 0.25,
           linewidth = 0.5
         )
     } else {
-      p = ggplot(data, aes(x = .data[[x_var]], y = .value, fill = method)) +
+      # If bias plot as boxplot
+      p = ggplot(data, aes(x = .data[[x_col]], y = .value, fill = method)) +
         geom_boxplot(
-          position = position_dodge(width = 0.8),
-          width = 0.7,
-          outlier.size = 0.8,
+          position      = position_dodge(width = 0.8),
+          width         = 0.7,
+          outlier.size  = 0.8,
           outlier.alpha = 0.5
         ) +
         geom_hline(yintercept = 0, linewidth = 0.7, colour = "grey60", linetype = "dashed")
     }
 
-    if (mode == "all" && !is.null(param_order)) {
+    if (mode == "all" && exists("vline_pos") && length(vline_pos) > 0) {
       p = p + geom_vline(
-        xintercept = which(!duplicated(gsub("-.*", "", param_order)))[-1] - 0.5,
-        linetype = "dashed",
-        colour = "grey60",
-        linewidth = 0.4
+        xintercept = vline_pos + 0.5,
+        linetype   = "dashed",
+        colour     = "grey60",
+        linewidth  = 0.4
       )
     }
 
     p = p + switch(paste(metric, mode),
-      "rmse by_model"  = scale_y_continuous(limits = c(0, 1.7), breaks = seq(0, 1.7, 0.2)),
-      "bias by_model"  = scale_y_continuous(limits = c(-6, 6), breaks = seq(-6, 6, 1), 
+      "rmse by_model"  = scale_y_continuous(limits = c(0, 1.7),  breaks = seq(0, 1.7, 0.2)),
+      "bias by_model"  = scale_y_continuous(limits = c(-6, 6),   breaks = seq(-6, 6, 1),
                                             expand = expansion(mult = c(0.1, 0.1))),
-      "bias all"       = scale_y_continuous(limits = c(-6, 6), breaks = seq(-6, 6, 1), 
+      "bias all"       = scale_y_continuous(limits = c(-6, 6),   breaks = seq(-6, 6, 1),
                                             expand = expansion(mult = c(0.1, 0.1))),
-      "bias avg_model" = scale_y_continuous(limits = c(-6, 6), breaks = seq(-6, 6, 1), 
+      "bias avg_model" = scale_y_continuous(limits = c(-6, 6),   breaks = seq(-6, 6, 1),
                                             expand = expansion(mult = c(0.1, 0.1))),
       NULL
     )
 
     p +
+      p_x_scale +
       facet_grid(prevalence ~ n_items + n_participants, labeller = facet_labeller) +
       scale_fill_manual(values = method_colors, labels = method_labels) +
       labs(x = x_label, y = y_label, fill = "Method") +
       theme_bw(base_size = base_size) +
       theme(
-        strip.text          = element_text(face = "bold"),
-        axis.text.x         = element_text(angle = x_angle, hjust = 1, size = x_size),
-        legend.position     = "right",
-        panel.grid.major.x  = element_blank(),
-        axis.text           = element_text(size = base_size),
-        axis.title          = element_text(size = base_size + 2),
-        legend.text         = element_text(size = 13),
-        legend.title        = element_text(size = base_size)
+        strip.text         = element_text(face = "bold"),
+        axis.text.x        = element_text(angle = x_angle, hjust = 1, size = x_size),
+        legend.position    = "right",
+        panel.grid.major.x = element_blank(),
+        axis.text          = element_text(size = base_size),
+        axis.title         = element_text(size = base_size + 2),
+        legend.text        = element_text(size = 13),
+        legend.title       = element_text(size = base_size)
       )
   }
 
@@ -448,89 +514,92 @@ bar_param_plot = function(params_df,
       if (nrow(df_model) == 0) next
       ggsave(
         filename = file.path(output_dir, paste0(file_prefix, "_", m, ".png")),
-        plot = make_plot(df_model),
-        width = width, height = height, dpi = 300
+        plot     = make_plot(df_model),
+        width    = width, height = height, dpi = 300
       )
     }
   } else {
-    filename = if (mode == "avg_model") paste0(file_prefix, "_avg_model.png") else paste0(file_prefix, ".png")
+    filename = if (mode == "avg_model") {
+      paste0(file_prefix, "_avg_model.png")
+    } else {
+      paste0(file_prefix, ".png")
+    }
     ggsave(
       filename = file.path(output_dir, filename),
-      plot = make_plot(df),
-      width = width, height = height, dpi = 300
+      plot     = make_plot(df),
+      width    = width, height = height, dpi = 300
     )
   }
 }
 
+# plot_param_ci = function(params_df,
+#                         output_dir = "./figures/empirical_params",
+#                         width = 10,
+#                         height = 8
+# ) {
+#   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
-plot_param_ci = function(params_df,
-                        output_dir = "./figures/empirical_params",
-                        width = 10,
-                        height = 8
-) {
-  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+#   # One plot per model x param x condition combination
+#   conditions = params_df %>%
+#     distinct(model, param_name, prevalence, n_participants, n_items)
 
-  # One plot per model x param x condition combination
-  conditions = params_df %>%
-    distinct(model, param_name, prevalence, n_participants, n_items)
+#   for (i in seq_len(nrow(conditions))) {
+#     cond = conditions[i, ]
 
-  for (i in seq_len(nrow(conditions))) {
-    cond = conditions[i, ]
+#     df = params_df %>%
+#       filter(
+#         model         == cond$model,
+#         param_name    == cond$param_name,
+#         prevalence    == cond$prevalence,
+#         n_participants == cond$n_participants,
+#         n_items       == cond$n_items
+#       ) %>%
+#       mutate(method = factor(method, levels = names(method_labels)))
 
-    df = params_df %>%
-      filter(
-        model         == cond$model,
-        param_name    == cond$param_name,
-        prevalence    == cond$prevalence,
-        n_participants == cond$n_participants,
-        n_items       == cond$n_items
-      ) %>%
-      mutate(method = factor(method, levels = names(method_labels)))
+#     # Rank participants within each method by their point estimate
+#     df = df %>%
+#       group_by(method) %>%
+#       mutate(rank = rank(predicted_value)) %>%
+#       ungroup()
 
-    # Rank participants within each method by their point estimate
-    df = df %>%
-      group_by(method) %>%
-      mutate(rank = rank(predicted_value)) %>%
-      ungroup()
+#     p = ggplot(df, aes(y = rank)) +
+#       geom_segment(
+#         aes(x = ci_lower, xend = ci_upper, yend = rank, color = within_ci),
+#         linewidth = 0.4
+#       ) +
+#       geom_point(aes(x = predicted_value), size = 0.6, color = "grey30") +
+#       geom_vline(aes(xintercept = true_value), linetype = "dashed", linewidth = 0.5) +
+#       scale_color_manual(
+#         values = c("TRUE" = "grey60", "FALSE" = "red"),
+#         labels = c("TRUE" = "Contains true", "FALSE" = "Misses true"),
+#         name   = NULL
+#       ) +
+#       facet_wrap(~ method, labeller = labeller(method = method_labels)) +
+#       labs(
+#         x = cond$param_name,
+#         y = "Participant",
+#         title = paste0(
+#           tools::toTitleCase(cond$model), " — ", cond$param_name,
+#           " | ", cond$prevalence, " prevalence",
+#           " | N=", cond$n_participants,
+#           ", ", cond$n_items * 3, " items"
+#         )
+#       ) +
+#       theme_bw(base_size = 13) +
+#       theme(
+#         strip.text      = element_text(face = "bold"),
+#         legend.position = "bottom",
+#         panel.grid.major.x = element_blank()
+#       )
 
-    p = ggplot(df, aes(y = rank)) +
-      geom_segment(
-        aes(x = ci_lower, xend = ci_upper, yend = rank, color = within_ci),
-        linewidth = 0.4
-      ) +
-      geom_point(aes(x = predicted_value), size = 0.6, color = "grey30") +
-      geom_vline(aes(xintercept = true_value), linetype = "dashed", linewidth = 0.5) +
-      scale_color_manual(
-        values = c("TRUE" = "grey60", "FALSE" = "red"),
-        labels = c("TRUE" = "Contains true", "FALSE" = "Misses true"),
-        name   = NULL
-      ) +
-      facet_wrap(~ method, labeller = labeller(method = method_labels)) +
-      labs(
-        x = cond$param_name,
-        y = "Participant",
-        title = paste0(
-          tools::toTitleCase(cond$model), " — ", cond$param_name,
-          " | ", cond$prevalence, " prevalence",
-          " | N=", cond$n_participants,
-          ", ", cond$n_items * 3, " items"
-        )
-      ) +
-      theme_bw(base_size = 13) +
-      theme(
-        strip.text      = element_text(face = "bold"),
-        legend.position = "bottom",
-        panel.grid.major.x = element_blank()
-      )
+#     fname = paste0(
+#       "ci_", cond$model, "_", cond$param_name, "_",
+#       cond$prevalence, "_N", cond$n_participants, "_items", cond$n_items * 3, ".png"
+#     )
 
-    fname = paste0(
-      "ci_", cond$model, "_", cond$param_name, "_",
-      cond$prevalence, "_N", cond$n_participants, "_items", cond$n_items * 3, ".png"
-    )
-
-    ggsave(file.path(output_dir, fname), p, width = width, height = height, dpi = 300)
-  }
-}
+#     ggsave(file.path(output_dir, fname), p, width = width, height = height, dpi = 300)
+#   }
+# }
 
 ######################################################################################################
 ######################################### RUNTIME ####################################################

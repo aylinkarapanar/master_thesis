@@ -124,6 +124,17 @@ source("./BF_PS.R")
 #   }
 # })
 
+#################################################################################
+######################### Hierchical Bayesian Inference #########################
+#################################################################################
+
+# system2(
+#   command = "python",
+#   args    = c("responsibility.py", "./data/"),
+#   wait    = TRUE,
+#   stdout  = ""   
+# )
+
 ################################################################################
 ########################### WAIC AND PSIS-LOO ##################################
 ################################################################################
@@ -462,6 +473,7 @@ lapply(metrics, function(m) {
   )
 })
 
+all_labels_df = read.csv("metrics/labels_all.csv")
 # Heatmap for confusion matrix of classifications
 visualise_cm(
   all_labels_df = all_labels_df %>% filter(method != "random"),
@@ -471,7 +483,8 @@ visualise_cm(
   overall = TRUE
 )
 
-# ind_params_df = read.csv("./metrics/ind_params_all.csv")
+ind_params_df = read.csv("./metrics/ind_params_all.csv")
+
 bar_param_plot(ind_params_df, metric = "rmse", mode = "all", width = 16, height = 8, output_dir = "./figures/params/individual")
 bar_param_plot(ind_params_df, metric = "rmse", mode = "by_model", width = 10, height = 6, output_dir = "./figures/params/individual")
 bar_param_plot(ind_params_df, metric = "rmse", mode = "avg_model", width = 12, height = 6, output_dir = "./figures/params/individual")
@@ -524,6 +537,8 @@ plot_runtime(runtime_df,
 # ##################################################################################
 # ####################### NUMERICAL SUMMARIES #######################################
 # ##################################################################################
+
+# Overall runtime summary
 runtime_df %>%
   group_by(method) %>%
   summarise(
@@ -533,27 +548,30 @@ runtime_df %>%
     median = median(runtime_min, na.rm = TRUE),
     q25 = quantile(runtime_min, 0.25, na.rm = TRUE),
     q75 = quantile(runtime_min, 0.75, na.rm = TRUE),
-    iqr = IQR(runtime_min, na.rm = TRUE),
     min = min(runtime_min, na.rm = TRUE),
     max = max(runtime_min, na.rm = TRUE)
-  ) %>%
-  arrange(median)
+  ) 
 
+# Runtime with scaling information by condition for method
 runtime_df %>%
-  group_by(method, prevalence, n_participants, n_items) %>%
+  group_by(method, prevalence_type, n_participant, n_items) %>%
   summarise(
-    n = n(),
-    mean = mean(runtime_min, na.rm = TRUE),
-    sd = sd(runtime_min, na.rm = TRUE),
-    median = median(runtime_min, na.rm = TRUE),
-    q25 = quantile(runtime_min, 0.25, na.rm = TRUE),
-    q75 = quantile(runtime_min, 0.75, na.rm = TRUE),
-
-    min = min(runtime_min, na.rm = TRUE),
-    max = max(runtime_min, na.rm = TRUE)
+    mean_runtime = mean(runtime_min, na.rm = TRUE),
+    .groups = "drop"
   ) %>%
-  arrange(median)
+  group_by(method) %>%
+  mutate(
+    baseline_runtime = mean_runtime[
+      prevalence_type == "equal" &
+      n_participant == 150 &
+      n_items == 60
+    ],
+    scaling = mean_runtime / baseline_runtime
+  ) %>%
+  ungroup() %>%
+  print(n = Inf, width = Inf)
 
+# Group-level parameter summaries
 print("Group-level Parameters")
 group_params_df %>%
   mutate(param_label = paste0(model, "-", param_name)) %>%
@@ -566,6 +584,16 @@ group_params_df %>%
   arrange(prevalence, n_participants, n_items, param_label, method) %>%
   print(n = Inf)
 
+group_params_df %>%
+  group_by(method, model) %>%
+  summarise(
+    mean_rmse = round(mean(rmse, na.rm = TRUE), 2),
+    sd_rmse   = round(sd(rmse, na.rm = TRUE), 2),
+    .groups   = "drop"
+  ) %>%
+  print(n = Inf, width = Inf)
+
+# Individual-level parameter summaries
 print("Individual Parameters")
 ind_params_df %>%
   mutate(param_label = paste0(model, "-", param_name)) %>%
@@ -578,17 +606,6 @@ ind_params_df %>%
   arrange(prevalence, n_participants, n_items, param_label, method) %>%
   print(n = Inf)
 
-print("Group-level Parameters")
-group_params_df %>%
-  group_by(method) %>%
-  summarise(
-    mean_rmse = round(mean(rmse, na.rm = TRUE), 2),
-    sd_rmse   = round(sd(rmse, na.rm = TRUE), 2),
-    .groups   = "drop"
-  ) %>%
-  print(n = Inf)
-
-print("Individual Parameters")
 ind_params_df %>%
   group_by(method, model) %>%
   summarise(
@@ -598,8 +615,8 @@ ind_params_df %>%
   ) %>%
   print(n = Inf)
 
-
-
+performance_df = read.csv("metrics/metrics_all.csv")
+# Summaries for classification metrics
 performance_df %>%
   group_by(prevalence, n_participants, n_items, method) %>%
   summarise(
@@ -616,7 +633,7 @@ performance_df %>%
   arrange(prevalence, n_participants, n_items, method) %>%
   print(n = Inf, width = Inf)
 
-overall_results = all_labels_df %>%
+all_labels_df %>%
   mutate(
     true = factor(true),
     predicted = factor(predicted, levels = levels(true))
@@ -642,11 +659,11 @@ overall_results = all_labels_df %>%
     c(overall_accuracy, mean_precision, mean_recall, mean_f1),
     ~ round(.x, 2)
   )) %>%
-  select(method, overall_accuracy, mean_precision, mean_recall, mean_f1)
+  select(method, overall_accuracy, mean_precision, mean_recall, mean_f1) %>%
+  print(width = Inf)
 
-print(overall_results, width = Inf)
-
-classification_results = all_labels_df %>%
+# Model-wise classification metrics
+all_labels_df %>%
   mutate(
     true = factor(true),
     predicted = factor(predicted, levels = levels(true))
@@ -691,16 +708,8 @@ classification_results = all_labels_df %>%
     Recall = round(Recall, 2),
     F1 = round(F1, 2)
   ) %>%
-  select(
-    method,
-    class,
-    class_accuracy,
-    Precision,
-    Recall,
-    F1
-  )
-
-print(classification_results, n = Inf, width = Inf)
+  select(method, class, class_accuracy, Precision, Recall, F1) %>%
+  print(n = Inf, width = Inf)
 
 # ##########################################################################################
 # ############################## EMPIRICAL STUDY ##########################################
@@ -789,7 +798,12 @@ pp_check_r2jags(bf_ps_empirical,
                 observed  = "fit",
                 simulated = "fitnew")
 
-
+system2(
+  command = "python",
+  args    = c("responsibility.py", empirical_data),
+  wait    = TRUE,
+  stdout  = ""   
+)
 
 model_selection_waic_loo(
   data_file = empirical_data,

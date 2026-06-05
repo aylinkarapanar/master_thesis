@@ -107,8 +107,6 @@ PRIOR_MEANS = [
     np.array([0.9]),
 ]
 
-#PRIOR_VARIANCE = 10
-
 PRIOR_VARIANCE = [
     np.array([1.0, 1.0]),            
     np.array([1.0]),                 
@@ -119,6 +117,7 @@ PRIOR_VARIANCE = [
     np.array([0.01]),               
 ]
 
+# Define parameter limits (truncations)
 configs = [
     Config(
         d=2, hard_bounds=np.array([[-np.inf, -np.inf], [np.inf, np.inf]]), verbose=False
@@ -163,10 +162,10 @@ def run_hbi_for_file(data_file):
     seed_file, output_base = make_output_base(data_file)
     n_participant, n_items, prevalence_type, seed = parse_metadata(data_file)
 
-    PARAM_DIR = Path(f"./parameter_estimates/hbi/{seed_file}")
-    ASSIGN_DIR = Path(f"./model_assignments/hbi/{seed_file}")
-    PROB_DIR   = Path(f"./model_assignments/hbi/prob_strat/{seed_file}")
-    OUT_DIR    = Path(f"./hbi_output/{seed_file}/{output_base}")
+    PARAM_DIR = Path(f"./results_data/parameter_estimates/hbi/{seed_file}")
+    ASSIGN_DIR = Path(f"./results_data/model_assignments/hbi/{seed_file}")
+    PROB_DIR   = Path(f"./results_data/model_assignments/hbi/prob_strat/{seed_file}")
+    OUT_DIR    = Path(f"./results_data/hbi_output/{seed_file}/{output_base}")
 
     for d in [PARAM_DIR, ASSIGN_DIR, PROB_DIR, OUT_DIR]:
         d.mkdir(parents=True, exist_ok=True)
@@ -277,6 +276,11 @@ def main(data_files, runs_file="runs.csv"):
         else:
             files_to_run.append(f)
 
+    # Uncomment to run on multiple cores (it runs different datafiles on different cores, recommended for multiple datafiles)
+    # Note: the runtime calculation won't be accurate, due to cueing
+
+    # Use all cores or adjust (if concurrently the computer is going to be used, set n_cores to available cores - 2 or 3)
+    
     # n_cores = os.cpu_count() - 2
     # machine_name = cpuinfo.get_cpu_info()['brand_raw']
 

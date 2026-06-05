@@ -21,11 +21,11 @@ bf_ps = function(data_file,
   if (seed_name == "data") seed_name = "empirical"
 
   output_roots = c(
-    parameter_estimates = "./parameter_estimates/product_space",
-    model_assignments = "./model_assignments/bf_ps",
-    prob_strat = "./model_assignments/bf_ps/prob_strat",
-    warnings = "./parameter_estimates/product_space/warnings",
-    traceplots = "./traceplots"
+    parameter_estimates = "./results_data/parameter_estimates/product_space",
+    model_assignments = "./results_data/model_assignments/bf_ps",
+    prob_strat = "./results_data/model_assignments/bf_ps/prob_strat",
+    warnings = "./results_data/parameter_estimates/product_space/warnings",
+    traceplots = "./traceplots/bf_ps"
   )
   
   lapply(output_roots, function(root) {
@@ -33,7 +33,6 @@ bf_ps = function(data_file,
   })
 
   # Import data and format it
-
   data_long = read.csv(data_file)
   
   datalistmod = list(

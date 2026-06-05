@@ -83,15 +83,15 @@ model_selection_waic_loo = function(data_file,
    if (seed_name == "data") seed_name = "empirical" 
 
   output_roots = c(
-    params_loo = "./parameter_estimates/non_hierarchical/PSIS-LOO",
-    params_waic = "./parameter_estimates/non_hierarchical/WAIC",
-    model_loo = "./model_assignments/PSIS-LOO/",
-    model_waic = "./model_assignments/WAIC/",
-    loo_df = "./model_assignments/PSIS-LOO/PSIS-LOO_df/",
-    waic_df = "./model_assignments/WAIC/WAIC_df/",
+    params_loo = "./results_data/parameter_estimates/non_hierarchical/PSIS-LOO",
+    params_waic = "./results_data/parameter_estimates/non_hierarchical/WAIC",
+    model_loo = "./results_data/model_assignments/PSIS-LOO/",
+    model_waic = "./results_data/model_assignments/WAIC/",
+    loo_df = "./results_data/model_assignments/PSIS-LOO/PSIS-LOO_df/",
+    waic_df = "./results_data/model_assignments/WAIC/WAIC_df/",
     traceplots_loo = "./traceplots/loo",
     traceplots_waic = "./traceplots/waic",
-    warnings = "./parameter_estimates/non_hierarchical/warnings"
+    warnings = "./results_data/parameter_estimates/non_hierarchical/warnings"
   )
   
   lapply(output_roots, function(root) {
@@ -345,6 +345,7 @@ model_selection_waic_loo = function(data_file,
   
   okabe_ito = okabeito_colors(1:7)
 
+  # TODO: fix, this doesn't work!!!
   # Open one PDF for all traceplots
   pdf(file.path(output_roots["traceplots_loo"], paste0(output_base, "_traceplots_loo.pdf")))
 
@@ -503,7 +504,7 @@ model_selection_waic_loo = function(data_file,
 
   pdf(file.path(output_roots["traceplots_waic"], paste0(output_base, "_traceplots_waic.pdf")))
 
-
+  # TODO: fix, this doesn't work!!!
   for (i in seq_along(samples_waic)) {
     
     # Skip empty models
