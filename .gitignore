@@ -212,3 +212,15 @@ model_assignments/
 parameter_estimates/
 traceplots/
 data/
+
+
+.DS_Store
+.DS_Store.lock
+.DS_Store.metadata
+**/.DS_Store
+**/.DS_Store.lock
+**/.DS_Store.metadata
+
+.Rapp.history
+.RData
+.Rhistory

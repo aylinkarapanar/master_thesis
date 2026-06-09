@@ -708,8 +708,8 @@ posterior_proportion = function(posterior_df,
     "sequential"  = "Sequential",
     "integrative" = "Integrative",
     "guessing"    = "Guessing",
-    "bias.d1"     = "Bias D1",
-    "bias.d2"     = "Bias D2"
+    "bias.d1"     = "Right-side Bias",
+    "bias.d2"     = "Left-side Bias"
   )
 
   model_levels = unname(model_labels)
@@ -831,6 +831,20 @@ plot_empirical_params = function(
   height = 8,
   psis_waic_name = "empirical_"
 ) {
+
+    param_math = c(
+    "b0"   = "beta[0]",
+    "bext" = "beta[ext]",
+    "bint" = "beta[int]",
+    "z"    = "xi"
+  )
+  model_display = c(
+    "internal"    = "Internal",
+    "external"    = "External",
+    "sequential"  = "Sequential",
+    "integrative" = "Integrative"
+  )
+
   
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
   
@@ -864,9 +878,10 @@ plot_empirical_params = function(
           geom_density_ridges(alpha = 0.5, linewidth = 0.6, scale = 0.9) +
           scale_fill_manual(values = method_colors, labels = method_labels, aesthetics = c("fill", "color")) +
           scale_y_discrete(labels = method_labels, limits = rev(names(method_colors))) +
-          facet_wrap(~ param, scales = "free") +
-          labs(x = "Estimate", y = NULL, fill = "Method", color = "Method",
-              title = tools::toTitleCase(m)) +
+          # New, try this
+          facet_wrap(~ param, scales = "free",
+           labeller = as_labeller(param_math, default = label_parsed)) + 
+          labs(x = "Estimate", y = NULL, fill = "Method", color = "Method") +
           theme_bw(base_size = 14) +
           theme(
             strip.text     = element_text(face = "bold"),
