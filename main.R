@@ -711,6 +711,108 @@ all_labels_df %>%
   select(method, class, class_accuracy, Precision, Recall, F1) %>%
   print(n = Inf, width = Inf)
 
+# Ambiguity in classification
+# Load all simulation posterior files
+sim_posterior_dirs = list(
+  bf_ps = "./results_data/model_assignments/bf_ps/prob_strat",
+  hbi   = "./results_data/model_assignments/hbi/prob_strat"
+)
+
+load_sim_posteriors = function(base_dir, method_name) {
+  files = list.files(base_dir, pattern = "\\.csv$", recursive = TRUE, full.names = TRUE)
+  files = files[!grepl("empirical", files)]
+  
+  bind_rows(lapply(files, function(f) {
+    read.csv(f, check.names = FALSE) %>%       
+      mutate(participant_id = row_number()) %>%
+      tidyr::pivot_longer(
+        cols      = -participant_id,
+        names_to  = "model",
+        values_to = "proportion"
+      ) %>%
+      mutate(
+        model     = tolower(model),
+        model     = trimws(model),             
+        model     = gsub(" ", ".", model),     
+        method    = method_name,
+        seed_file = f
+      )
+  }))
+}
+
+sim_posterior_df = bind_rows(
+  load_sim_posteriors(sim_posterior_dirs$bf_ps, "bf_ps"),
+  load_sim_posteriors(sim_posterior_dirs$hbi,   "hbi")
+)
+
+# Load labels
+all_labels_df = read.csv("./metrics/labels_all.csv") %>%
+  mutate(
+    true_model = case_when(
+      true == 1 ~ "internal",
+      true == 2 ~ "external",
+      true == 3 ~ "sequential",
+      true == 4 ~ "integrative",
+      true == 5 ~ "guessing",
+      true == 6 ~ "bias.d1",
+      true == 7 ~ "bias.d2"
+    )
+  ) %>%
+  # Extract condition info
+  mutate(
+    seed = as.character(seed),
+    participant_id = ID
+  )
+
+# Total number of simulated participants per model
+all_labels_df  %>%
+  filter(method == "bf_ps") %>%
+  count(true_model) %>%
+  arrange(true_model)
+
+sim_posterior_df %>%
+  group_by(method, seed_file, participant_id) %>%
+  arrange(desc(proportion), .by_group = TRUE) %>%
+  mutate(
+    rank        = row_number(),
+    best        = proportion[rank == 1],
+    second_best = proportion[rank == 2],
+    gap         = best - second_best
+  ) %>%
+  slice_max(proportion, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  mutate(
+    ambiguous      = gap < 0.1,                 
+    seed           = basename(dirname(seed_file)),
+    n_participants = as.integer(str_extract(basename(seed_file), "^\\d+")),
+    n_items        = as.integer(str_extract(basename(seed_file), "(?<=\\d_)\\d+")) / 3,
+    prevalence     = str_extract(basename(seed_file), "(?<=\\d_)(equal|extreme)")
+  ) %>%
+  left_join(
+    all_labels_df %>% select(participant_id, true_model, method, n_participants, n_items, prevalence, seed),
+    by = c("participant_id", "method", "n_participants", "n_items", "prevalence", "seed")
+  ) %>%
+  mutate(correct = model == true_model) %>%
+  group_by(method) %>%
+  mutate(
+    n_total       = n(),
+    n_ambiguous   = sum(ambiguous),
+    pct_ambiguous = round(n_ambiguous / n_total * 100, 1)
+  ) %>%
+  group_by(method, model, n_total, n_ambiguous, pct_ambiguous) %>%
+  summarise(
+    n                       = n(),
+    n_ambiguous_model       = sum(ambiguous),
+    pct_ambiguous_model     = round(n_ambiguous_model / n * 100, 1),
+    n_ambiguous_correct     = sum(ambiguous & correct, na.rm = TRUE),
+    pct_ambiguous_correct   = ifelse(n_ambiguous_model == 0, 0,
+                                round(n_ambiguous_correct / n_ambiguous_model * 100, 1)),
+    n_ambiguous_incorrect   = sum(ambiguous & !correct, na.rm = TRUE),
+    pct_ambiguous_incorrect = ifelse(n_ambiguous_model == 0, 0,
+                                round(n_ambiguous_incorrect / n_ambiguous_model * 100, 1)),
+    .groups = "drop"
+  ) %>%
+  print(width = Inf)
 # ##########################################################################################
 # ############################## EMPIRICAL STUDY ##########################################
 # ##########################################################################################
@@ -718,85 +820,12 @@ source("./BF_PS.R")
 empirical_data = "./data/empirical_data_merged.csv"
 
 bf_ps_empirical = bf_ps(data_file = empirical_data,
-                        jags_text = "./JAGS_models/JAGS_hierarchical_ppc.txt",
+                        jags_text = "./JAGS_models/JAGS_hierarchical.txt",
                         n_iter    = 20000,
                         n_burnin  = 5000,
                         n_thin    = 100,
                         jags_seed = initial_seed
                       )
-install.packages("bfw")
-library(bfw)
-install.packages("coda")
-library(coda)
-
-coda_chains = as.mcmc(bf_ps_empirical)
-
-# Convergence diagnostics
-DiagMCMC(data.MCMC = coda_chains, par.name = "b0mean")
-DiagMCMC(data.MCMC = coda_chains, par.name = "fit")
-
-pp_check_r2jags = function(samples,
-                           observed  = "fit",
-                           simulated = "fitnew",
-                           xlab = "Observed discrepancy",
-                           ylab = "Simulated discrepancy",
-                           main = "Posterior Predictive Check") {
-  
-  sims = samples$BUGSoutput$sims.matrix
-  
-  # Extract posterior draws
-  fit_obs = sims[, observed]
-  fit_new = sims[, simulated]
-  
-  # Bayesian p-value: proportion of iterations where simulated > observed
-  bp_value = mean(fit_new > fit_obs)
-  
-  # Plot
-  lims = range(c(fit_obs, fit_new))
-  
-  plot(
-    fit_obs, fit_new,
-    xlim  = lims,
-    ylim  = lims,
-    xlab  = xlab,
-    ylab  = ylab,
-    main  = main,
-    pch   = 16,
-    col   = adjustcolor("steelblue", alpha.f = 0.3),
-    cex   = 0.6,
-    asp   = 1
-  )
-  
-  abline(0, 1, col = "red", lwd = 2)   # diagonal: perfect fit line
-  
-  legend("topleft",
-         legend = paste0("Bayesian p = ", round(bp_value, 3)),
-         bty = "n",
-         cex = 1.2)
-  
-  message(paste0("Bayesian p-value: ", round(bp_value, 3)))
-  
-  invisible(list(fit_obs  = fit_obs,
-                 fit_new  = fit_new,
-                 bp_value = bp_value))
-}
-
-
-params = c(
-  "b0", "b0mean", "b0sd",
-  "bint", "bintmean", "bintsd",
-  "bext", "bextmean", "bextsd",
-  "z", "zmean", "zsd",
-  "guess", "guessmean", "guesssd",
-  "bias1", "bias1mean", "bias1sd",
-  "bias2", "bias2mean", "bias2sd",
-  "strat", "r", "alpha",
-  "fit", "fitnew"
-)
-
-pp_check_r2jags(bf_ps_empirical,
-                observed  = "fit",
-                simulated = "fitnew")
 
 system2(
   command = "python",
@@ -844,9 +873,36 @@ load_posterior_file = function(file, method_name) {
 }
 
 posterior_df = bind_rows(
-  load_posterior_file("./results_data/model_assignments/bf_ps/prob_strat/empirical/empirical_data_merged_prob_strat.csv", "BFPS"),
-  load_posterior_file("results_data/model_assignments/hbi/prob_strat/empirical/empirical_data_merged_prob_strat.csv", "HBI")
+  load_posterior_file("./results_data/model_assignments/bf_ps/prob_strat/empirical/empirical_prob_strat.csv", "bf_ps"),
+  load_posterior_file("results_data/model_assignments/hbi/prob_strat/empirical/empirical_data_merged_prob_strat.csv", "hbi")
 )
+
+posterior_df %>%
+  group_by(method, participant_id) %>%
+  arrange(desc(proportion), .by_group = TRUE) %>%
+  mutate(
+    rank        = row_number(),
+    best        = proportion[rank == 1],
+    second_best = proportion[rank == 2],
+    gap         = best - second_best
+  ) %>%
+  slice_max(proportion, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  mutate(ambiguous = gap < 0.1) %>%
+  group_by(method) %>%
+  mutate(
+    n_total       = n(),
+    n_ambiguous   = sum(ambiguous),
+    pct_ambiguous = round(n_ambiguous / n_total * 100, 1)
+  ) %>%
+  group_by(method, model, n_total, n_ambiguous, pct_ambiguous) %>%
+  summarise(
+    n              = n(),
+    n_ambiguous_model = sum(ambiguous),
+    pct_ambiguous_model = round(n_ambiguous_model / n * 100, 1),
+    .groups = "drop"
+  ) %>%
+  print(width = Inf)
 
 posterior_proportion(
   posterior_df,

@@ -277,7 +277,7 @@ visualise_cm = function(all_labels_df,
         scale_fill_gradient(low = "white", high = col, limits = c(0, 1), name = "Proportion") +
         scale_x_discrete(position = "top") +
         scale_y_discrete(limits = rev) +
-        labs(x = "Predicted strategy model", y = "Simulated strategy model") +
+        labs(x = "Predicted strategy model", y = "True strategy model") +
         overall_theme
  
       ggsave(file.path(cm_output_dir, paste0("cm_overall_", m, ".png")),
@@ -369,7 +369,7 @@ bar_param_plot = function(params_df,
     }
   }
 
-  y_label     = if (metric == "rmse") "Mean RMSE" else "Bias"
+  y_label     = if (metric == "rmse") "Mean MAE" else "Bias"
   file_prefix = paste0("bar_", metric)
   base_size   = if (metric == "bias" && mode != "by_model") 14 else 12
 
@@ -532,75 +532,6 @@ bar_param_plot = function(params_df,
   }
 }
 
-# plot_param_ci = function(params_df,
-#                         output_dir = "./figures/empirical_params",
-#                         width = 10,
-#                         height = 8
-# ) {
-#   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-
-#   # One plot per model x param x condition combination
-#   conditions = params_df %>%
-#     distinct(model, param_name, prevalence, n_participants, n_items)
-
-#   for (i in seq_len(nrow(conditions))) {
-#     cond = conditions[i, ]
-
-#     df = params_df %>%
-#       filter(
-#         model         == cond$model,
-#         param_name    == cond$param_name,
-#         prevalence    == cond$prevalence,
-#         n_participants == cond$n_participants,
-#         n_items       == cond$n_items
-#       ) %>%
-#       mutate(method = factor(method, levels = names(method_labels)))
-
-#     # Rank participants within each method by their point estimate
-#     df = df %>%
-#       group_by(method) %>%
-#       mutate(rank = rank(predicted_value)) %>%
-#       ungroup()
-
-#     p = ggplot(df, aes(y = rank)) +
-#       geom_segment(
-#         aes(x = ci_lower, xend = ci_upper, yend = rank, color = within_ci),
-#         linewidth = 0.4
-#       ) +
-#       geom_point(aes(x = predicted_value), size = 0.6, color = "grey30") +
-#       geom_vline(aes(xintercept = true_value), linetype = "dashed", linewidth = 0.5) +
-#       scale_color_manual(
-#         values = c("TRUE" = "grey60", "FALSE" = "red"),
-#         labels = c("TRUE" = "Contains true", "FALSE" = "Misses true"),
-#         name   = NULL
-#       ) +
-#       facet_wrap(~ method, labeller = labeller(method = method_labels)) +
-#       labs(
-#         x = cond$param_name,
-#         y = "Participant",
-#         title = paste0(
-#           tools::toTitleCase(cond$model), " — ", cond$param_name,
-#           " | ", cond$prevalence, " prevalence",
-#           " | N=", cond$n_participants,
-#           ", ", cond$n_items * 3, " items"
-#         )
-#       ) +
-#       theme_bw(base_size = 13) +
-#       theme(
-#         strip.text      = element_text(face = "bold"),
-#         legend.position = "bottom",
-#         panel.grid.major.x = element_blank()
-#       )
-
-#     fname = paste0(
-#       "ci_", cond$model, "_", cond$param_name, "_",
-#       cond$prevalence, "_N", cond$n_participants, "_items", cond$n_items * 3, ".png"
-#     )
-
-#     ggsave(file.path(output_dir, fname), p, width = width, height = height, dpi = 300)
-#   }
-# }
-
 ######################################################################################################
 ######################################### RUNTIME ####################################################
 ######################################################################################################
@@ -731,6 +662,10 @@ posterior_proportion = function(posterior_df,
 
     p = ggplot(df, aes(x = participant_id, y = proportion, fill = model)) +
       geom_col(width = 1, color = "white", linewidth = 0.1) + 
+      geom_hline(yintercept = c(0.25, 0.50, 0.75),          
+                 linetype = "dotted",                        
+                 color = "black",                            
+                 linewidth = 0.5) +
       scale_fill_brewer(palette = "Set2", breaks = model_levels) +
       scale_y_continuous(expand = c(0, 0)) +
       scale_x_discrete(expand = c(0, 0)) +
@@ -963,5 +898,109 @@ plot_empirical_params = function(
     
     }
   }
+}
+
+plot_assignment_confidence = function(
+  prob_dirs = list(
+    bf_ps = "./results_data/model_assignments/bf_ps/prob_strat",
+    hbi   = "./results_data/model_assignments/hbi/prob_strat"
+  ),
+  output_dir = "./figures/confidence",
+  width  = 12,
+  height = 8
+) {
+  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+
+  all_df = bind_rows(lapply(names(prob_dirs), function(method_name) {
+    prob_files = list.files(
+      prob_dirs[[method_name]],
+      pattern   = "\\.csv$",
+      full.names = TRUE,
+      recursive  = TRUE
+    )
+    bind_rows(lapply(prob_files, function(f) {
+      probs     = read.csv(f)
+      colnames(probs) = tolower(trimws(colnames(probs)))
+      seed_name = basename(dirname(f))
+      base      = sub("_prob_strat\\.csv$|_prob_strat_.*\\.csv$", "", basename(f))
+      prob_cols = setdiff(colnames(probs), c("id", "participant_id"))
+
+      probs %>%
+        mutate(participant_id = row_number()) %>%
+        rowwise() %>%
+        mutate(
+          sorted_probs   = list(sort(c_across(all_of(prob_cols)), decreasing = TRUE)),
+          max_prob       = sorted_probs[[1]],
+          second_prob    = sorted_probs[[2]],
+          margin         = max_prob - second_prob,
+          assigned_model = prob_cols[which.max(c_across(all_of(prob_cols)))]
+        ) %>%
+        ungroup() %>%
+        select(participant_id, max_prob, second_prob, margin, assigned_model) %>%
+        mutate(method = method_name, seed = seed_name, base_core = base)
+    }))
+  })) %>%
+    filter(seed != "empirical") %>%
+    mutate(
+      seed           = as.character(seed),
+      participant_id = as.integer(participant_id),
+      n_participants = as.integer(str_split_i(base_core, "_", 1)),
+      n_items        = as.integer(str_split_i(base_core, "_", 2)) / 3,
+      prevalence     = str_split_i(base_core, "_", 3)
+    )
+
+  labels_df = read.csv("./metrics/labels_all.csv") %>%
+    filter(method %in% names(prob_dirs)) %>%
+    mutate(
+      correct        = true == predicted,
+      seed           = as.character(seed),
+      participant_id = as.integer(ID)
+    )
+
+  all_df = all_df %>%
+    left_join(
+      labels_df %>%
+        select(method, seed, n_participants, n_items, prevalence,
+               participant_id, correct),
+      by = c("method", "seed", "n_participants", "n_items",
+             "prevalence", "participant_id")
+    ) %>%
+    mutate(
+      method  = factor(method, levels = names(method_colors)),
+      correct = factor(correct, levels = c(TRUE, FALSE),
+                       labels = c("Correct", "Incorrect"))
+    )
+
+  # Plot A: density of assigned model probability
+  p_a = ggplot(all_df, aes(x = max_prob, fill = correct, colour = correct)) +
+    geom_density(alpha = 0.4, linewidth = 0.7) +
+    facet_wrap(~ method, labeller = as_labeller(method_labels)) +
+    scale_fill_manual(values   = c("Correct" = "#185FA5", "Incorrect" = "#993C1D")) +
+    scale_colour_manual(values = c("Correct" = "#185FA5", "Incorrect" = "#993C1D")) +
+    scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2)) +
+    labs(x = "Probability of assigned model", y = "Density",
+         fill = "Assignment", colour = "Assignment") +
+    theme_bw(base_size = 14) +
+    theme(strip.text = element_text(face = "bold"), legend.position = "right")
+
+  ggsave(file.path(output_dir, "plot_confidence_prob.png"),
+         p_a, width = width, height = height / 1.5, dpi = 300)
+
+  # Plot B: density of margin
+  p_b = ggplot(all_df, aes(x = margin, fill = correct, colour = correct)) +
+    geom_density(alpha = 0.4, linewidth = 0.7) +
+    facet_wrap(~ method, labeller = as_labeller(method_labels)) +
+    scale_fill_manual(values   = c("Correct" = "#185FA5", "Incorrect" = "#993C1D")) +
+    scale_colour_manual(values = c("Correct" = "#185FA5", "Incorrect" = "#993C1D")) +
+    scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2)) +
+    labs(x = "Assigned - second best", y = "Density",
+         fill = "Assignment", colour = "Assignment") +
+    theme_bw(base_size = 14) +
+    theme(strip.text = element_text(face = "bold"), legend.position = "right")
+
+  ggsave(file.path(output_dir, "plot_confidence_margin.png"),
+         p_b, width = width, height = height / 1.5, dpi = 300)
+
+  invisible(all_df)
 }
 

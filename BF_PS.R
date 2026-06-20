@@ -123,6 +123,8 @@ bf_ps = function(data_file,
       factor(x, levels = 1:7)
     ))))
   
+  nrow(strat_mat)
+  nrow(sims_mat)
   colnames(prob_strat) = c(
     "internal",
     "external",
