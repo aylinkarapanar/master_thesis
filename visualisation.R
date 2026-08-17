@@ -369,7 +369,7 @@ bar_param_plot = function(params_df,
     }
   }
 
-  y_label     = if (metric == "rmse") "Mean MAE" else "Bias"
+  y_label     = if (metric == "rmse") "MAE" else "Bias"
   file_prefix = paste0("bar_", metric)
   base_size   = if (metric == "bias" && mode != "by_model") 14 else 12
 

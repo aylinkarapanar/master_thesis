@@ -170,7 +170,6 @@ def run_hbi_for_file(data_file):
     for d in [PARAM_DIR, ASSIGN_DIR, PROB_DIR, OUT_DIR]:
         d.mkdir(parents=True, exist_ok=True)
 
-    n_participant, n_items, prevalence_type, seed = parse_metadata(data_file)
     df = pd.read_csv(data_file)
 
     all_data = []

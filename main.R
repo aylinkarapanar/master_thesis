@@ -766,9 +766,9 @@ all_labels_df = read.csv("./metrics/labels_all.csv") %>%
 
 # Total number of simulated participants per model
 all_labels_df  %>%
-  filter(method == "bf_ps") %>%
+  filter(method == "bf_ps", prevalence == "extreme") %>%
   count(true_model) %>%
-  arrange(true_model)
+  arrange(true_model) 
 
 sim_posterior_df %>%
   group_by(method, seed_file, participant_id) %>%
