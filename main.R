@@ -16,17 +16,17 @@ n_rep = 50
 seed_vector = seq(from = initial_seed, to = initial_seed + n_rep - 1)
 
 # Create a df to keep track of the runs done
-# runs = data.frame(
-#  file   = character(),
-#  bf_ps  = logical(),
-#  waic   = logical(),
-#  loo    = logical(),
-#  hbi    = logical(),
-#  stringsAsFactors = FALSE
-# )
+runs = data.frame(
+ file   = character(),
+ bf_ps  = logical(),
+ waic   = logical(),
+ loo    = logical(),
+ hbi    = logical(),
+ stringsAsFactors = FALSE
+)
 
-# Save it to CSV
-# write.csv(runs, "runs.csv", row.names = FALSE)
+Save it to CSV
+write.csv(runs, "runs.csv", row.names = FALSE)
 
 ###############################################################################
 ############################ DATA SIMULATION ##################################
@@ -51,28 +51,28 @@ simulation_conditions$prevalence =
 
 setDT(simulation_conditions)
 
-# lapply(seed_vector, function(seed) {
+lapply(seed_vector, function(seed) {
 
-#   set.seed(seed)
+  set.seed(seed)
 
-#   for (i in 1:nrow(simulation_conditions)) {
-#   simulate_strategy_data(
-#     seed = seed,
-#     n_participants = simulation_conditions$n_participant[[i]],
-#     n_items = simulation_conditions$n_items[[i]],
-#     strategy_probs = simulation_conditions$prevalence[[i]],
-#     condition = "all",
-#     # Hyperparameters
-#     #bint_mean = simulation_conditions$params[[i]]$bint_mean,
-#     #bext_mean = simulation_conditions$params[[i]]$bext_mean,
-#     #z_mean = simulation_conditions$params[[i]]$z_mean,]
+  for (i in 1:nrow(simulation_conditions)) {
+  simulate_strategy_data(
+    seed = seed,
+    n_participants = simulation_conditions$n_participant[[i]],
+    n_items = simulation_conditions$n_items[[i]],
+    strategy_probs = simulation_conditions$prevalence[[i]],
+    condition = "all",
+    # Hyperparameters
+    #bint_mean = simulation_conditions$params[[i]]$bint_mean,
+    #bext_mean = simulation_conditions$params[[i]]$bext_mean,
+    #z_mean = simulation_conditions$params[[i]]$z_mean,]
 
-#     # Describe the prevalence and parameter values for naming the files
-#     prevalence_desc = simulation_conditions$prevalence_type[[i]],
-#     #param_desc = simulation_conditions$params_type[[i]]
-#   )
-# }
-# })
+    # Describe the prevalence and parameter values for naming the files
+    prevalence_desc = simulation_conditions$prevalence_type[[i]],
+    #param_desc = simulation_conditions$params_type[[i]]
+  )
+}
+})
 
 ################################################################################
 ###################### Bayes Factor Estimation Using Product Space ##############
@@ -81,153 +81,153 @@ setDT(simulation_conditions)
 source("./BF_PS.R")
 
 # Create time_df to store the runtime of the fucntion
-# time_df = copy(simulation_conditions)
+time_df = copy(simulation_conditions)
 
-# time_df = simulation_conditions[rep(1:nrow(simulation_conditions), each = n_rep), ]
-# time_df$prevalence = NULL
-# time_df$seed = rep(seed_vector, times = nrow(simulation_conditions))
-# time_df$total_runtime = NA
-# time_df$no_of_cores = NA
-# time_df$name = NA
+time_df = simulation_conditions[rep(1:nrow(simulation_conditions), each = n_rep), ]
+time_df$prevalence = NULL
+time_df$seed = rep(seed_vector, times = nrow(simulation_conditions))
+time_df$total_runtime = NA
+time_df$no_of_cores = NA
+time_df$name = NA
 
-# # Create the runtime csv
-# write.csv(time_df, file = "./runtime/runtime_bf_ps.csv", row.names = FALSE)
+# Create the runtime csv
+write.csv(time_df, file = "./runtime/runtime_bf_ps.csv", row.names = FALSE)
 
 # Get all the data files in the data folder
-# data_files = list.files("./data", pattern = "_data\\.csv$", full.names = TRUE, recursive = TRUE)
+data_files = list.files("./data", pattern = "_data\\.csv$", full.names = TRUE, recursive = TRUE)
 
 # Apply the function to all the data files which were not already used
-# lapply(data_files, function(f) {
-#   runs = read.csv("runs.csv", stringsAsFactors = FALSE)
+lapply(data_files, function(f) {
+  runs = read.csv("runs.csv", stringsAsFactors = FALSE)
 
-#   row_idx = which(runs$file == f)
-#   already_done = any(runs$file == f & runs$bf_ps == TRUE, na.rm = TRUE)
+  row_idx = which(runs$file == f)
+  already_done = any(runs$file == f & runs$bf_ps == TRUE, na.rm = TRUE)
 
-#   if (!already_done) {
-#     bf_ps(
-#       data_file = f,
-#       jags_text = "./JAGS_models/JAGS_hierarchical.txt",
-#       n_iter    = 20000,
-#       n_burnin  = 5000,
-#       n_thin    = 100,
-#       jags_seed = initial_seed
-#     )
-#     if (length(row_index)>0) {
-#       runs$bf_ps[row_idx] = TRUE
-#     } else {
-#       runs = rbind(
-#       runs,
-#       data.frame(file = f, bf_ps = TRUE, waic = NA, loo = NA, hbi = NA))
-#     }
+  if (!already_done) {
+    bf_ps(
+      data_file = f,
+      jags_text = "./JAGS_models/JAGS_hierarchical.txt",
+      n_iter    = 20000,
+      n_burnin  = 5000,
+      n_thin    = 100,
+      jags_seed = initial_seed
+    )
+    if (length(row_index)>0) {
+      runs$bf_ps[row_idx] = TRUE
+    } else {
+      runs = rbind(
+      runs,
+      data.frame(file = f, bf_ps = TRUE, waic = NA, loo = NA, hbi = NA))
+    }
 
-#     write.csv(runs, "runs.csv", row.names = FALSE)
-#   }
-# })
+    write.csv(runs, "runs.csv", row.names = FALSE)
+  }
+})
 
 #################################################################################
 ######################### Hierchical Bayesian Inference #########################
 #################################################################################
 
-# system2(
-#   command = "python",
-#   args    = c("responsibility.py", "./data/"),
-#   wait    = TRUE,
-#   stdout  = ""   
-# )
+system2(
+  command = "python",
+  args    = c("responsibility.py", "./data/"),
+  wait    = TRUE,
+  stdout  = ""   
+)
 
 ################################################################################
 ########################### WAIC AND PSIS-LOO ##################################
 ################################################################################
 source("./WAIC_and_PSIS.R")
 
-# time_df = simulation_conditions[rep(1:nrow(simulation_conditions), each = n_rep), ]
-# time_df$prevalence = NULL
-# time_df$seed = rep(seed_vector, times = nrow(simulation_conditions))
-# time_df$no_of_cores = NA
-# time_df$name = NA
+time_df = simulation_conditions[rep(1:nrow(simulation_conditions), each = n_rep), ]
+time_df$prevalence = NULL
+time_df$seed = rep(seed_vector, times = nrow(simulation_conditions))
+time_df$no_of_cores = NA
+time_df$name = NA
 
-# write.csv(time_df, "./runtime/runtime_waic_loo.csv", row.names = FALSE)
+write.csv(time_df, "./runtime/runtime_waic_loo.csv", row.names = FALSE)
 
-# data_files = list.files("./data", pattern = "_data\\.csv$", full.names = TRUE, recursive = TRUE)
-# data_files = rev(data_files)
-# # List of models with their txt file paths and parameters
-# models = list(
-#   "internal" = list(
-#     "file_path" = "./JAGS_models/JAGS_internal.txt",
-#     "params" = c("b0", "b0mean", "b0sd",
-#                  "bint", "bintmean", "bintsd",
-#                  "loglik")
-#   ),
-#   "external" = list(
-#     "file_path" =  "./JAGS_models/JAGS_external.txt",
-#     "params" = c("bext", "bextmean", "bextsd",
-#                  "loglik")
-#   ),
-#   "sequential" = list(
-#     "file_path" =  "./JAGS_models/JAGS_sequential.txt",
-#     "params" = c("b0", "b0mean", "b0sd",
-#                  "bint", "bintmean", "bintsd",
-#                  "bext", "bextmean", "bextsd",
-#                  "z", "zmean", "zsd",
-#                  "loglik")
-#   ),
-#   "integrative" = list(
-#     "file_path" = "./JAGS_models/JAGS_integrative.txt",
-#     "params" = c("b0", "b0mean", "b0sd",
-#                  "bint", "bintmean", "bintsd",
-#                  "bext", "bextmean", "bextsd",
-#                  "loglik")
+data_files = list.files("./data", pattern = "_data\\.csv$", full.names = TRUE, recursive = TRUE)
+data_files = rev(data_files)
+# List of models with their txt file paths and parameters
+models = list(
+  "internal" = list(
+    "file_path" = "./JAGS_models/JAGS_internal.txt",
+    "params" = c("b0", "b0mean", "b0sd",
+                 "bint", "bintmean", "bintsd",
+                 "loglik")
+  ),
+  "external" = list(
+    "file_path" =  "./JAGS_models/JAGS_external.txt",
+    "params" = c("bext", "bextmean", "bextsd",
+                 "loglik")
+  ),
+  "sequential" = list(
+    "file_path" =  "./JAGS_models/JAGS_sequential.txt",
+    "params" = c("b0", "b0mean", "b0sd",
+                 "bint", "bintmean", "bintsd",
+                 "bext", "bextmean", "bextsd",
+                 "z", "zmean", "zsd",
+                 "loglik")
+  ),
+  "integrative" = list(
+    "file_path" = "./JAGS_models/JAGS_integrative.txt",
+    "params" = c("b0", "b0mean", "b0sd",
+                 "bint", "bintmean", "bintsd",
+                 "bext", "bextmean", "bextsd",
+                 "loglik")
 
-#   ),
-#   "guess" = list(
-#     "file_path" = "./JAGS_models/JAGS_guess.txt",
-#     "params" = c("guess", "guessmean", "guesssd",
-#                  "loglik")
-#   ),
-#   "bias1" = list(
-#     "file_path" = "./JAGS_models/JAGS_bias1.txt",
-#     "params" = c("bias1", "bias1mean", "bias1sd",
-#                  "loglik")
+  ),
+  "guess" = list(
+    "file_path" = "./JAGS_models/JAGS_guess.txt",
+    "params" = c("guess", "guessmean", "guesssd",
+                 "loglik")
+  ),
+  "bias1" = list(
+    "file_path" = "./JAGS_models/JAGS_bias1.txt",
+    "params" = c("bias1", "bias1mean", "bias1sd",
+                 "loglik")
 
-#   ),
-#   "bias2" = list(
-#     "file_path" = "./JAGS_models/JAGS_bias2.txt",
-#     "params" = c("bias2", "bias2mean", "bias2sd",
-#                  "loglik")
-#   )
-# )
+  ),
+  "bias2" = list(
+    "file_path" = "./JAGS_models/JAGS_bias2.txt",
+    "params" = c("bias2", "bias2mean", "bias2sd",
+                 "loglik")
+  )
+)
 
-# lapply(data_files, function(f) {
-#   runs = read.csv("runs.csv", stringsAsFactors = FALSE)
+lapply(data_files, function(f) {
+  runs = read.csv("runs.csv", stringsAsFactors = FALSE)
 
-#   row_idx = which(runs$file == f)
-#   already_done = any(runs$file == f & runs$waic == TRUE & runs$loo == TRUE, na.rm = TRUE)
+  row_idx = which(runs$file == f)
+  already_done = any(runs$file == f & runs$waic == TRUE & runs$loo == TRUE, na.rm = TRUE)
 
-#   if (already_done) {
-#   cat("Already done:", f, "\n")}
+  if (already_done) {
+  cat("Already done:", f, "\n")}
 
-#   if (!already_done) {
-#     cat("Running: ", f, "\n")
-#     model_selection_waic_loo(
-#       data_file   = f,
-#       model_list  = models,
-#       n_iter      = 5000,
-#       n_burnin    = 1000,
-#       n_thin      = 5,
-#       jags_seed   = initial_seed,
-#       time_data_file = "./runtime/runtime_waic_loo.csv"
-#     )}
+  if (!already_done) {
+    cat("Running: ", f, "\n")
+    model_selection_waic_loo(
+      data_file   = f,
+      model_list  = models,
+      n_iter      = 5000,
+      n_burnin    = 1000,
+      n_thin      = 5,
+      jags_seed   = initial_seed,
+      time_data_file = "./runtime/runtime_waic_loo.csv"
+    )}
 
-#     if (length(row_idx) > 0) {
-#       runs$waic[row_idx] = TRUE
-#       runs$loo[row_idx] = TRUE
-#     } else {
-#     runs = rbind(
-#       runs,
-#       data.frame(file = f, bf_ps = NA, waic = TRUE, loo = TRUE, hbi = NA)
-#   )}
-#     write.csv(runs, "runs.csv", row.names = FALSE)
-#   })
+    if (length(row_idx) > 0) {
+      runs$waic[row_idx] = TRUE
+      runs$loo[row_idx] = TRUE
+    } else {
+    runs = rbind(
+      runs,
+      data.frame(file = f, bf_ps = NA, waic = TRUE, loo = TRUE, hbi = NA)
+  )}
+    write.csv(runs, "runs.csv", row.names = FALSE)
+  })
 
 # ################################################################################
 # ########################## RANDOM ASSIGNMENT  ##################################
@@ -941,11 +941,6 @@ group_param_dirs = list(
   psis  = "./results_data/parameter_estimates/non_hierarchical/PSIS-LOO/empirical",
   waic  = "./results_data/parameter_estimates/non_hierarchical/WAIC/empirical"
 )
-
-# hbi_samples = get_group_param_samples("hbi", group_param_dirs, param_mapping)
-# bf_ps_samples = get_group_param_samples("bf_ps", group_param_dirs, param_mapping)
-# waic_samples = get_group_param_samples("waic", group_param_dirs, param_mapping)
-# psis_samples = get_group_param_samples("psis", group_param_dirs, param_mapping)
 
 # Group level plots
 plot_empirical_params(

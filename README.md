@@ -18,45 +18,44 @@ MASTER_THESIS/
 │   ├── JAGS_integrative.txt                     
 │   ├── JAGS_internal.txt                        
 │   └── JAGS_sequential.txt                      
-├── parameter_estimates/                         # Parameter estimates [gitignored]
-│   ├── product_space/                           # From Bayes Factor / Product Space
+├── results_data/
+│   ├── parameter_estimates/                     # Parameter estimates [gitignored]
+│   │   └── product_space/                       # From Bayes Factor Product Space
+│   │       └── warnings/                        # Rhat and ESS warnings
+│   ├── non_hierarchical/                        # From WAIC and PSIS-LOO
+│   │   ├── PSIS-LOO/                            # Per-model parameter estimates (LOO)
+│   │   ├── WAIC/                                # Per-model parameter estimates (WAIC)
 │   │   └── warnings/                            # Rhat and ESS warnings
-│   └── non_hierarchical/                        # From WAIC and PSIS-LOO
-│       ├── PSIS-LOO/                            # Per-model parameter estimates (LOO)
-│       ├── WAIC/                                # Per-model parameter estimates (WAIC)
-│       └── warnings/                            # Rhat and ESS warnings
-├── model_assignments/                           # Model assignments per participant [gitignored]
-│   ├── bf_ps/                                   # Assignments from Bayes Factor estimation using Product Space
-│   │   └── prob_strat/                          # Posterior strategy probabilities
-│   ├── PSIS-LOO/                                # Assignments from PSIS-LOO
-│   │   └── PSIS-LOO_df/                         # Raw LOOIC values per model
-│   ├── WAIC/                                    # Assignments from WAIC
-│   │   └── WAIC_df/                             # Raw WAIC values per model
-│   └── hbi/                                     # Assignments from HBI
-│       └── prob_strat/                          # Responsibility matrices
-├── hbi_output/                                  # Full HBI output (pickles) [gitignored]
-│   └── {seed}/{output_base}/
-│       ├── cbm_m{k}.pkl                         # Individual CBM fits per model
-│       ├── hbi.pkl                              # Full HBI fit
-│       └── {output_base}_full_output.pkl        # Full output object
-├── metrics/                                     # Classification performance metrics
-│   └── metrics_all.csv                          # Combined metrics across all methods
-├── runtime/                                     # Runtime logs
-│   ├── runtime_bf_ps.csv                        # BF/PS runtimes
-│   ├── runtime_waic_loo.csv                     # WAIC and LOO runtimes
-│   └── runtime_hbi.csv                          # HBI runtimes
-├── traceplots/                                  # MCMC traceplots [gitignored]
-│   ├── loo/                                     # Traceplots from LOO refits
-│   └── waic/                                    # Traceplots from WAIC refits
-├── data_simulation.R                            # Data simulation script
+│   ├── model_assignments/                       # Model assignments per participant [gitignored]
+│   │   ├── bf_ps/                               # Assignments from Bayes Factor estimation using Product Space
+│   │   │   └── prob_strat/                      # Posterior strategy probabilities
+│   │   ├── PSIS-LOO/                            # Assignments from PSIS-LOO
+│   │   │   └── PSIS-LOO_df/                     # Raw LOOIC values per model
+│   │   ├── WAIC/                                # Assignments from WAIC
+│   │   │   └── WAIC_df/                         # Raw WAIC values per model
+│   │   └── hbi/                                 # Assignments from HBI
+│   │       └── prob_strat/                      # Responsibility matrices
+│   ├── hbi_output/                              # Full HBI output (pickles) [gitignored]
+│   │   └── {seed}/{output_base}/
+│   │       ├── cbm_m{k}.pkl                     # Individual CBM fits per model
+│   │       ├── hbi.pkl                          # Full HBI fit
+│   │       └── {output_base}_full_output.pkl    # Full output object
+│   ├── metrics/                                 # Classification performance metrics
+│   │   └── metrics_all.csv                      # Combined metrics across all methods
+│   ├── runtime/                                 # Runtime logs
+│   │   ├── runtime_bf_ps.csv                    # BF/PS runtimes
+│   │   ├── runtime_waic_loo.csv                 # WAIC and LOO runtimes
+│   │   └── runtime_hbi.csv                      # HBI runtimes
 ├── main.R                                       # Main R file to run all the scripts
+├── data_simulation.R                            # Data simulation script
+├── BF_PS.R                                      # Fitting of BHMM and its model assignment
 ├── metrics.R                                    # Classification metrics computation
 ├── parameter.R                                  # Analysis of parameter estimations
-├── BF_PS.R                                      # Fitting of BHMM and its model assignment 
-├── responsibility.py                            # HBI model fitting (Python)
-├── requirements.txt                             # Python dependencies
+├── WAIC_and_PSIS.R                              # Fitting of non-hierarchical models and their model a
 ├── visualisation.R                              # Visualisation script
-└── WAIC_and_PSIS.R                              # Fitting of non-hierarhical models and their model assignments
+├── responsibility.py                            # HBI model fitting (Python)
+├── eat_the_pickle.py                            # Python script to read pickle files
+└── requirements.txt                             # Python dependencies
 ```
 
 > **Note:** Folders marked [gitignored] are not included in the repository because they
@@ -161,7 +160,8 @@ All R scripts are sourced automatically from `main.R` and R package
 dependencies are installed automatically — no manual installation needed.
 
 `main.R` calls `responsibility.py` via `system2()` for the HBI model 
-fitting step. If you want to run the Python step separately, 
+fitting step, but the uv venv needs to created and activated regardless.
+If you want to run the Python step separately, 
 `responsibility.py` can be called directly with either a single file 
 or a directory:
 
