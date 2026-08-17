@@ -73,7 +73,7 @@ R packages are managed automatically, no manual installation is required.
 ### Python
 
 Python 3.10+ is required (developed and tested on Python 3.13.2). Install python via the https://www.python.org/downloads/
-Python dependencies are listed in `requirements.txt` and managed via `uv`.
+Python dependencies are listed in `requirements.txt` and managed via `uv` (https://docs.astral.sh/uv/pip/environments/).
 
 Install `uv` if you don't have it yet:
 
